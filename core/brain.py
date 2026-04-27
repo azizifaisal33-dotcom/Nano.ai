@@ -1,32 +1,39 @@
 import os
+import subprocess
 
 from core.command_ai import CommandAI
 from core.agent import Agent
 from core.revolver import Revolver
-
-# asumsi kamu sudah punya engine & fs & backup
 from core.engine import engine
 
 
+# =========================
+# FILE SYSTEM SAFE
+# =========================
 class FileSystem:
     def read(self, path):
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return f.read()
 
     def write(self, path, content):
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(content)
 
 
+# =========================
+# BACKUP SAFE
+# =========================
 class DummyBackup:
     def create(self):
-        # minimal backup (biar tidak error kalau belum ada sistem backup)
         try:
-            os.system("cp core/brain.py core/brain.py.bak")
+            os.system("cp core/brain.py core/brain_backup.py")
         except:
             pass
 
 
+# =========================
+# MAIN BRAIN
+# =========================
 class Brain:
     def __init__(self):
         self.cmd_ai = CommandAI()
@@ -36,8 +43,40 @@ class Brain:
         self.backup = DummyBackup()
         self.revolver = Revolver(self.fs, self.backup)
 
+        # =====================
+        # GGUF / LLAMA CONFIG
+        # =====================
+        self.model_path = self.find_model()
+
+        print("🧠 Nano AI Brain Ready")
+
+        if not self.model_path:
+            print("⚠️ model GGUF tidak ditemukan di folder models/")
+
     # =========================
-    # CORE THINK
+    # AUTO DETECT GGUF
+    # =========================
+    def find_model(self):
+        possible = [
+            "./models/model.gguf",
+            "./model.gguf",
+            "./models/"
+        ]
+
+        for p in possible:
+            if os.path.isfile(p):
+                return p
+
+        # kalau folder models ada, ambil file pertama gguf
+        if os.path.isdir("./models"):
+            for f in os.listdir("./models"):
+                if f.endswith(".gguf"):
+                    return os.path.join("./models", f)
+
+        return None
+
+    # =========================
+    # THINK CORE
     # =========================
     def think(self, text):
         text = text.strip().lower()
@@ -81,16 +120,15 @@ class Brain:
             try:
                 result = engine.run(c)
 
-                if result["success"] and result["output"]:
+                if result.get("success") and result.get("output"):
                     return f"⚙️ {c}\n{result['output']}"
 
-                else:
-                    last_error = result.get("output", "")
+                last_error = result.get("output", "")
 
             except Exception as e:
                 last_error = str(e)
 
         # =====================
-        # FAIL
+        # FAIL SAFE
         # =====================
-        return f"❌ gagal\n{last_error}"
+        return f"❌ gagal\n{last_error if last_error else 'no output'}"
