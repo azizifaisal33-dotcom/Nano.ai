@@ -32,6 +32,28 @@ class DummyBackup:
 
 
 # =========================
+# SAFETY FILTER (IMPORTANT)
+# =========================
+def safe_command(cmd: str):
+    blacklist = [
+        "rm -rf",
+        "shutdown",
+        "reboot",
+        "git pull",
+        "git push",
+        "nano",
+        "vim",
+        "sudo"
+    ]
+
+    for b in blacklist:
+        if b in cmd:
+            return None
+
+    return cmd
+
+
+# =========================
 # MAIN BRAIN
 # =========================
 class Brain:
@@ -43,12 +65,9 @@ class Brain:
         self.backup = DummyBackup()
         self.revolver = Revolver(self.fs, self.backup)
 
-        # =====================
-        # GGUF / LLAMA CONFIG
-        # =====================
         self.model_path = self.find_model()
 
-        print("🧠 Nano AI Brain Ready")
+        print("🧠 Nano AI Brain ONLINE")
 
         if not self.model_path:
             print("⚠️ model GGUF tidak ditemukan di folder models/")
@@ -57,17 +76,9 @@ class Brain:
     # AUTO DETECT GGUF
     # =========================
     def find_model(self):
-        possible = [
-            "./models/model.gguf",
-            "./model.gguf",
-            "./models/"
-        ]
+        if os.path.isfile("./models/model.gguf"):
+            return "./models/model.gguf"
 
-        for p in possible:
-            if os.path.isfile(p):
-                return p
-
-        # kalau folder models ada, ambil file pertama gguf
         if os.path.isdir("./models"):
             for f in os.listdir("./models"):
                 if f.endswith(".gguf"):
@@ -76,14 +87,9 @@ class Brain:
         return None
 
     # =========================
-    # THINK CORE
+    # AGENT MODE
     # =========================
-    def think(self, text):
-        text = text.strip().lower()
-
-        # =====================
-        # AGENT MODE
-        # =====================
+    def handle_agent(self, text):
         if text.startswith("agent"):
             if "start" in text:
                 goal = text.replace("agent start", "").strip()
@@ -95,40 +101,6 @@ class Brain:
             if "log" in text:
                 return self.agent.log()
 
-        # =====================
-        # EVOLVE MODE
-        # =====================
-        if text.startswith("evolve"):
-            parts = text.split(" ", 2)
+        return None
 
-            if len(parts) < 3:
-                return "format: evolve <file> <instruksi>"
-
-            file = parts[1]
-            instr = parts[2]
-
-            return self.revolver.evolve(file, instr)
-
-        # =====================
-        # COMMAND MODE
-        # =====================
-        cmds = self.cmd_ai.generate(text)
-
-        last_error = ""
-
-        for c in cmds:
-            try:
-                result = engine.run(c)
-
-                if result.get("success") and result.get("output"):
-                    return f"⚙️ {c}\n{result['output']}"
-
-                last_error = result.get("output", "")
-
-            except Exception as e:
-                last_error = str(e)
-
-        # =====================
-        # FAIL SAFE
-        # =====================
-        return f"❌ gagal\n{last_error if last_error else 'no output'}"
+    # =========================
