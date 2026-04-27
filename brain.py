@@ -1,27 +1,36 @@
 #!/usr/bin/env python3
 """
-🧠 NANO AI v12 - CONTINUOUS EVOLUTION BRAIN
-Self-expanding modular AI system (safe architecture removed restrictions but stable)
+🧠 NANO AI v21 - SELF OPTIMIZING CORE
+Priority engine + adaptive memory + performance loop
 """
 
 import os
+import time
 import subprocess
 import importlib
 import json
-import shutil
+import threading
 from datetime import datetime
 
 
 # ==========================
-# 🧠 CORE BRAIN
+# 🧠 MAIN BRAIN
 # ==========================
 class NanoBrain:
 
     def __init__(self):
         self.memory = []
         self.plugins = {}
-        self.usage_stats = {}
-        self.version = "v12"
+        self.task_queue = []
+        self.running = True
+
+        self.performance_log = {
+            "tasks_done": 0,
+            "tasks_failed": 0,
+            "avg_time": 0
+        }
+
+        self.version = "v21"
 
         self.commands = {}
         self.register_commands()
@@ -29,244 +38,273 @@ class NanoBrain:
         self.load_memory()
         self.load_plugins()
 
-        print("\n🧠 NANO AI v12 EVOLUTION BRAIN")
-        print("⚡ Self Growing AI + Memory + Plugins + Git\n")
+        self.worker = threading.Thread(target=self.background_loop)
+        self.worker.daemon = True
+        self.worker.start()
+
+        print("\n🧠 NANO AI v21 SELF-OPTIMIZING CORE")
+        print("⚡ Priority Engine + Adaptive Memory + Loop\n")
 
     # ==========================
-    # SHELL RUNNER
+    # SHELL
     # ==========================
     def run(self, cmd):
         return subprocess.getoutput(cmd)
 
     # ==========================
-    # COMMAND SYSTEM
+    # COMMANDS
     # ==========================
     def register_commands(self):
 
         self.commands = {
-            "ram": self.cmd_ram,
-            "cpu": self.cmd_cpu,
-            "disk": self.cmd_disk,
-            "ip": self.cmd_ip,
-            "help": self.cmd_help,
-            "install": self.cmd_install,
-            "update": self.cmd_update,
-            "plugin": self.cmd_plugin,
-            "analyze": self.cmd_analyze,
-            "learn": self.cmd_learn,
-            "stats": self.cmd_stats,
+            "plan": self.cmd_plan,
+            "run": self.cmd_run,
+            "tasks": self.cmd_tasks,
+            "status": self.cmd_status,
+            "memory": self.cmd_memory,
+            "optimize": self.cmd_optimize,
         }
 
     # ==========================
-    # MEMORY SYSTEM
+    # MEMORY
     # ==========================
     def load_memory(self):
         try:
-            with open("memory.json", "r") as f:
-                self.memory = json.load(f)
+            self.memory = json.load(open("memory.json"))
         except:
             self.memory = []
 
     def save_memory(self):
-        try:
-            with open("memory.json", "w") as f:
-                json.dump(self.memory[-200:], f)
-        except:
-            pass
+        json.dump(self.memory[-600:], open("memory.json","w"))
 
     # ==========================
     # PLUGINS
     # ==========================
     def load_plugins(self):
+
+        self.plugins = {}
+
         for folder in ["core", "Plugins"]:
             if not os.path.exists(folder):
                 continue
 
             for file in os.listdir(folder):
                 if file.endswith(".py"):
-                    name = f"{folder}.{file[:-3]}"
+                    module = f"{folder}.{file[:-3]}"
+
                     try:
-                        self.plugins[name] = importlib.import_module(name)
-                        print(f"📦 loaded: {name}")
+                        self.plugins[module] = importlib.import_module(module)
                     except:
                         pass
 
-    # ==========================
-    # SYSTEM COMMANDS
-    # ==========================
-    def cmd_ram(self, args):
-        return self.run("free -h")
-
-    def cmd_cpu(self, args):
-        return self.run("top -bn1 | head -10")
-
-    def cmd_disk(self, args):
-        return self.run("df -h")
-
-    def cmd_ip(self, args):
-        return self.run("ip addr")
-
-    def cmd_help(self, args):
-        return """
-🧠 NANO AI v12
-
-ram cpu disk ip
-install <pkg>
-plugin <name>
-analyze
-learn <skill>
-stats
-update
-"""
-
-    def cmd_install(self, args):
-        return f"pkg install {args[0]}" if args else "install <pkg>"
+        print(f"🔌 plugins: {len(self.plugins)}")
 
     # ==========================
-    # UPDATE SYSTEM
+    # PLANNER (WITH PRIORITY)
     # ==========================
-    def cmd_update(self, args):
-        print("🔄 git update...")
+    def cmd_plan(self, args):
 
-        self.backup()
+        task = " ".join(args)
 
-        result = self.run("git pull origin main")
+        priority = self.calculate_priority(task)
 
-        if "Already up to date" not in result:
-            os.execv("python", ["python", "brain.py"])
+        plan = {
+            "task": task,
+            "steps": [
+                "analyze",
+                "execute",
+                "verify"
+            ],
+            "priority": priority,
+            "status": "queued",
+            "created": str(datetime.now())
+        }
 
-        return "ok"
+        self.task_queue.append(plan)
+
+        self.sort_tasks()
+
+        return plan
 
     # ==========================
-    # PLUGIN LOADER
+    # PRIORITY ENGINE
     # ==========================
-    def cmd_plugin(self, args):
-        if not args:
-            return "plugin <name>"
+    def calculate_priority(self, task):
 
-        name = args[0]
+        score = 0
+
+        if "error" in task or "fix" in task:
+            score += 5
+
+        if "install" in task:
+            score += 3
+
+        if "github" in task:
+            score += 2
+
+        return score
+
+    def sort_tasks(self):
+
+        self.task_queue.sort(key=lambda x: x["priority"], reverse=True)
+
+    # ==========================
+    # RUN TASK
+    # ==========================
+    def cmd_run(self, args):
+
+        if not self.task_queue:
+            return "no tasks"
+
+        task = self.task_queue.pop(0)
+
+        start = time.time()
+
+        results = []
 
         try:
-            mod = importlib.import_module(f"core.{name}")
-            self.plugins[name] = mod
-            return f"loaded {name}"
+            for step in task["steps"]:
+                results.append(self.safe_execute(step))
+
+            task["status"] = "done"
+            self.performance_log["tasks_done"] += 1
+
         except:
-            return "not found"
+            task["status"] = "failed"
+            self.performance_log["tasks_failed"] += 1
+
+        end = time.time()
+
+        self.update_avg_time(end - start)
+
+        return results
 
     # ==========================
-    # ANALYZE SYSTEM
+    # TASK LIST
     # ==========================
-    def cmd_analyze(self, args):
-
-        score = len(self.plugins) * 10 + len(self.memory) // 2
-
-        return f"health {score}/100"
+    def cmd_tasks(self, args):
+        return self.task_queue
 
     # ==========================
-    # LEARNING SYSTEM (NEW CORE)
+    # MEMORY SEARCH (WEIGHTED)
     # ==========================
-    def cmd_learn(self, args):
+    def cmd_memory(self, args):
 
         if not args:
-            return "learn <skill>"
+            return "memory <query>"
 
-        skill = args[0]
+        q = args[0]
 
-        file = f"core/auto_{skill}.py"
+        scored = []
 
-        code = f'''
-# AUTO GENERATED MODULE
-def run():
-    return "skill {skill} active"
-'''
+        for m in self.memory:
+            weight = m.get("weight", 1)
+            if q in m["input"]:
+                scored.append((weight, m))
 
-        with open(file, "w") as f:
-            f.write(code)
+        scored.sort(reverse=True, key=lambda x: x[0])
 
-        return f"learned {skill}"
+        return [m for w, m in scored[:5]]
 
     # ==========================
-    # STATS SYSTEM
+    # STATUS
     # ==========================
-    def cmd_stats(self, args):
+    def cmd_status(self, args):
 
         return {
+            "version": self.version,
             "memory": len(self.memory),
             "plugins": len(self.plugins),
-            "version": self.version
+            "tasks": len(self.task_queue),
+            "performance": self.performance_log
         }
 
     # ==========================
-    # EVOLUTION TRACKING
+    # AUTO OPTIMIZE ENGINE
     # ==========================
-    def track(self, cmd):
+    def cmd_optimize(self, args):
 
-        self.usage_stats[cmd] = self.usage_stats.get(cmd, 0) + 1
+        avg = self.performance_log["avg_time"]
+
+        if avg > 2:
+            suggestion = "reduce subprocess calls"
+        else:
+            suggestion = "system stable"
+
+        return {
+            "avg_time": avg,
+            "suggestion": suggestion
+        }
 
     # ==========================
-    # REASON ENGINE (NEW CORE)
+    # SAFE EXECUTION
+    # ==========================
+    def safe_execute(self, step):
+
+        blacklist = ["rm", "dd", "shutdown"]
+
+        for b in blacklist:
+            if b in step:
+                return "blocked"
+
+        return f"executed: {step}"
+
+    # ==========================
+    # PERFORMANCE TRACKING
+    # ==========================
+    def update_avg_time(self, new_time):
+
+        old = self.performance_log["avg_time"]
+
+        self.performance_log["avg_time"] = (old + new_time) / 2
+
+    # ==========================
+    # BACKGROUND LOOP (OPTIMIZER)
+    # ==========================
+    def background_loop(self):
+
+        while self.running:
+
+            # auto re-sort tasks
+            self.sort_tasks()
+
+            # adaptive memory weighting
+            for m in self.memory[-50:]:
+                m["weight"] = m.get("weight", 1) + 0.1
+
+            time.sleep(3)
+
+    # ==========================
+    # REASON ENGINE
     # ==========================
     def reason(self, text):
 
-        text = text.lower()
-        self.track(text.split()[0] if text.split() else "none")
-
-        parts = text.split()
+        parts = text.lower().split()
 
         if parts and parts[0] in self.commands:
             return self.commands[parts[0]](parts[1:])
 
-        # natural mapping
-        if "ram" in text:
-            return self.cmd_ram([])
+        if "plan" in text:
+            return self.cmd_plan(parts[1:])
 
-        if "cpu" in text:
-            return self.cmd_cpu([])
+        if "run" in text:
+            return self.cmd_run([])
 
-        if "disk" in text:
-            return self.cmd_disk([])
-
-        if "install" in text:
-            return self.cmd_install([text.split()[-1]])
-
-        if "update" in text:
-            return self.cmd_update([])
-
-        if "learn" in text:
-            return self.cmd_learn([text.split()[-1]])
-
-        return self.fallback(text)
-
-    # ==========================
-    # FALLBACK
-    # ==========================
-    def fallback(self, text):
         return f"unknown: {text}"
-
-    # ==========================
-    # BACKUP SYSTEM
-    # ==========================
-    def backup(self):
-        folder = f"backup_{self.version}"
-
-        if os.path.exists(folder):
-            shutil.rmtree(folder)
-
-        shutil.copytree(".", folder,
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git"))
 
     # ==========================
     # MAIN LOOP
     # ==========================
     def start(self):
 
-        print("\n🧠 v12 running\n")
+        print("\n🧠 v21 READY (self-optimizing)\n")
 
-        while True:
+        while self.running:
             try:
                 user = input("nano> ")
 
                 if user in ["exit", "quit"]:
+                    self.running = False
                     break
 
                 out = self.reason(user)
@@ -275,13 +313,14 @@ def run():
                 self.memory.append({
                     "input": user,
                     "output": str(out),
-                    "time": str(datetime.now())
+                    "time": str(datetime.now()),
+                    "weight": 1
                 })
 
                 self.save_memory()
 
             except KeyboardInterrupt:
-                print("\nstop")
+                self.running = False
                 break
 
 
