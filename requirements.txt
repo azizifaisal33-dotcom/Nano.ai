@@ -1,0 +1,4 @@
+numpy==1.24.3
+faiss-cpu==1.7.4
+rich==13.5.2
+sqlite3
