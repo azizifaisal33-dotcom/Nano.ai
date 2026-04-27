@@ -1,8 +1,0 @@
-{
-  "model": "model.gguf",
-  "ctx_size": 2048,
-  "temperature": 0.7,
-  "top_k": 40,
-  "top_p": 0.9,
-  "repeat_penalty": 1.1
-}
