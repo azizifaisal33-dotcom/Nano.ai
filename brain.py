@@ -1,132 +1,292 @@
 #!/usr/bin/env python3
 """
-🧠 NANO AI v2 + TERMUX ENCYCLOPEDIA (FIXED VERSION)
+🧠 NANO AI v12 - CONTINUOUS EVOLUTION BRAIN
+Self-expanding modular AI system (safe architecture removed restrictions but stable)
 """
 
+import os
 import subprocess
+import importlib
+import json
+import shutil
 from datetime import datetime
 
 
-class TermuxBrain:
+# ==========================
+# 🧠 CORE BRAIN
+# ==========================
+class NanoBrain:
+
     def __init__(self):
         self.memory = []
-        print("🧠 NANO AI + TERMUX BRAIN LOADED!")
-        print("💾 Ready for Termux commands")
+        self.plugins = {}
+        self.usage_stats = {}
+        self.version = "v12"
 
-    # SAFE RUN COMMAND
-    def run_cmd(self, cmd):
-        try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            return result.stdout.strip() if result.stdout else result.stderr.strip()
-        except:
-            return "❌ Command error"
+        self.commands = {}
+        self.register_commands()
 
-    # TERMUX KNOWLEDGE
-    def get_termux_knowledge(self, query):
-        query = query.lower()
+        self.load_memory()
+        self.load_plugins()
 
-        if "ram" in query:
-            return f"📊 RAM:\n{self.run_cmd('free -h')}"
+        print("\n🧠 NANO AI v12 EVOLUTION BRAIN")
+        print("⚡ Self Growing AI + Memory + Plugins + Git\n")
 
-        if "cpu" in query:
-            return f"⚙️ CPU:\n{self.run_cmd('top -bn1 | head -15')}"
+    # ==========================
+    # SHELL RUNNER
+    # ==========================
+    def run(self, cmd):
+        return subprocess.getoutput(cmd)
 
-        if "disk" in query:
-            return f"💾 Disk:\n{self.run_cmd('df -h')}"
+    # ==========================
+    # COMMAND SYSTEM
+    # ==========================
+    def register_commands(self):
 
-        if "ip" in query:
-            return f"🌐 IP:\n{self.run_cmd('ip addr')}"
-
-        if "uptime" in query:
-            return f"⏱ Uptime:\n{self.run_cmd('uptime')}"
-
-        return None
-
-    # PACKAGE GUIDE
-    def package_guide(self, pkg):
-        packages = {
-            "python": "pkg install python python-pip",
-            "git": "pkg install git",
-            "node": "pkg install nodejs",
-            "curl": "pkg install curl",
-            "wget": "pkg install wget",
+        self.commands = {
+            "ram": self.cmd_ram,
+            "cpu": self.cmd_cpu,
+            "disk": self.cmd_disk,
+            "ip": self.cmd_ip,
+            "help": self.cmd_help,
+            "install": self.cmd_install,
+            "update": self.cmd_update,
+            "plugin": self.cmd_plugin,
+            "analyze": self.cmd_analyze,
+            "learn": self.cmd_learn,
+            "stats": self.cmd_stats,
         }
-        return packages.get(pkg, f"pkg search {pkg}")
 
-    # TROUBLESHOOT
-    def troubleshoot(self, text):
-        if "no module" in text:
-            return "pip install <module>"
-        if "permission denied" in text:
-            return "termux-setup-storage"
-        if "not found" in text:
-            return "pkg install <command>"
-        return "Coba: pkg update && pkg upgrade"
-
-    # MAIN LOGIC
-    def think(self, text):
-        text = text.strip().lower()
-        time = datetime.now().strftime("%H:%M:%S")
-
-        # SYSTEM KNOWLEDGE
-        knowledge = self.get_termux_knowledge(text)
-        if knowledge:
-            response = knowledge
-
-        # INSTALL COMMAND
-        elif "install" in text:
-            pkg = text.split()[-1]
-            response = f"🔧 Install:\n{self.package_guide(pkg)}"
-
-        # ERROR HANDLING
-        elif "error" in text or "gagal" in text:
-            response = f"🔧 Fix:\n{self.troubleshoot(text)}"
-
-        # HELP
-        elif "help" in text:
-            response = f"""
-🧠 TERMUX BRAIN HELP
-
-📦 install python git node
-📊 cek ram | cek cpu | cek disk
-🌐 ip | uptime
-❓ error fix otomatis
-"""
-
-        # GREETING
-        elif any(x in text for x in ["halo", "hai", "hello"]):
-            response = f"🤖 Halo! Nano AI aktif ({time})"
-
-        else:
-            response = f"🤖 Unknown: {text}\n💡 coba help"
-
-        self.memory.append((text, response))
-        return response
-
-
-def main():
-    print("\n🧠 NANO AI TERMUX BRAIN STARTED\n")
-
-    brain = TermuxBrain()
-
-    while True:
+    # ==========================
+    # MEMORY SYSTEM
+    # ==========================
+    def load_memory(self):
         try:
-            user = input("\nnano> ")
+            with open("memory.json", "r") as f:
+                self.memory = json.load(f)
+        except:
+            self.memory = []
 
-            if user.lower() in ["exit", "quit"]:
-                print("👋 Bye!")
-                break
+    def save_memory(self):
+        try:
+            with open("memory.json", "w") as f:
+                json.dump(self.memory[-200:], f)
+        except:
+            pass
 
-            if not user:
+    # ==========================
+    # PLUGINS
+    # ==========================
+    def load_plugins(self):
+        for folder in ["core", "Plugins"]:
+            if not os.path.exists(folder):
                 continue
 
-            result = brain.think(user)
-            print(result)
+            for file in os.listdir(folder):
+                if file.endswith(".py"):
+                    name = f"{folder}.{file[:-3]}"
+                    try:
+                        self.plugins[name] = importlib.import_module(name)
+                        print(f"📦 loaded: {name}")
+                    except:
+                        pass
 
-        except KeyboardInterrupt:
-            print("\n👋 Stop")
-            break
+    # ==========================
+    # SYSTEM COMMANDS
+    # ==========================
+    def cmd_ram(self, args):
+        return self.run("free -h")
+
+    def cmd_cpu(self, args):
+        return self.run("top -bn1 | head -10")
+
+    def cmd_disk(self, args):
+        return self.run("df -h")
+
+    def cmd_ip(self, args):
+        return self.run("ip addr")
+
+    def cmd_help(self, args):
+        return """
+🧠 NANO AI v12
+
+ram cpu disk ip
+install <pkg>
+plugin <name>
+analyze
+learn <skill>
+stats
+update
+"""
+
+    def cmd_install(self, args):
+        return f"pkg install {args[0]}" if args else "install <pkg>"
+
+    # ==========================
+    # UPDATE SYSTEM
+    # ==========================
+    def cmd_update(self, args):
+        print("🔄 git update...")
+
+        self.backup()
+
+        result = self.run("git pull origin main")
+
+        if "Already up to date" not in result:
+            os.execv("python", ["python", "brain.py"])
+
+        return "ok"
+
+    # ==========================
+    # PLUGIN LOADER
+    # ==========================
+    def cmd_plugin(self, args):
+        if not args:
+            return "plugin <name>"
+
+        name = args[0]
+
+        try:
+            mod = importlib.import_module(f"core.{name}")
+            self.plugins[name] = mod
+            return f"loaded {name}"
+        except:
+            return "not found"
+
+    # ==========================
+    # ANALYZE SYSTEM
+    # ==========================
+    def cmd_analyze(self, args):
+
+        score = len(self.plugins) * 10 + len(self.memory) // 2
+
+        return f"health {score}/100"
+
+    # ==========================
+    # LEARNING SYSTEM (NEW CORE)
+    # ==========================
+    def cmd_learn(self, args):
+
+        if not args:
+            return "learn <skill>"
+
+        skill = args[0]
+
+        file = f"core/auto_{skill}.py"
+
+        code = f'''
+# AUTO GENERATED MODULE
+def run():
+    return "skill {skill} active"
+'''
+
+        with open(file, "w") as f:
+            f.write(code)
+
+        return f"learned {skill}"
+
+    # ==========================
+    # STATS SYSTEM
+    # ==========================
+    def cmd_stats(self, args):
+
+        return {
+            "memory": len(self.memory),
+            "plugins": len(self.plugins),
+            "version": self.version
+        }
+
+    # ==========================
+    # EVOLUTION TRACKING
+    # ==========================
+    def track(self, cmd):
+
+        self.usage_stats[cmd] = self.usage_stats.get(cmd, 0) + 1
+
+    # ==========================
+    # REASON ENGINE (NEW CORE)
+    # ==========================
+    def reason(self, text):
+
+        text = text.lower()
+        self.track(text.split()[0] if text.split() else "none")
+
+        parts = text.split()
+
+        if parts and parts[0] in self.commands:
+            return self.commands[parts[0]](parts[1:])
+
+        # natural mapping
+        if "ram" in text:
+            return self.cmd_ram([])
+
+        if "cpu" in text:
+            return self.cmd_cpu([])
+
+        if "disk" in text:
+            return self.cmd_disk([])
+
+        if "install" in text:
+            return self.cmd_install([text.split()[-1]])
+
+        if "update" in text:
+            return self.cmd_update([])
+
+        if "learn" in text:
+            return self.cmd_learn([text.split()[-1]])
+
+        return self.fallback(text)
+
+    # ==========================
+    # FALLBACK
+    # ==========================
+    def fallback(self, text):
+        return f"unknown: {text}"
+
+    # ==========================
+    # BACKUP SYSTEM
+    # ==========================
+    def backup(self):
+        folder = f"backup_{self.version}"
+
+        if os.path.exists(folder):
+            shutil.rmtree(folder)
+
+        shutil.copytree(".", folder,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git"))
+
+    # ==========================
+    # MAIN LOOP
+    # ==========================
+    def start(self):
+
+        print("\n🧠 v12 running\n")
+
+        while True:
+            try:
+                user = input("nano> ")
+
+                if user in ["exit", "quit"]:
+                    break
+
+                out = self.reason(user)
+                print(out)
+
+                self.memory.append({
+                    "input": user,
+                    "output": str(out),
+                    "time": str(datetime.now())
+                })
+
+                self.save_memory()
+
+            except KeyboardInterrupt:
+                print("\nstop")
+                break
 
 
+# ==========================
+# RUN
+# ==========================
 if __name__ == "__main__":
-    main()
+    NanoBrain().start()
