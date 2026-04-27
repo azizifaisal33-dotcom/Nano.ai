@@ -1,306 +1,203 @@
 #!/usr/bin/env python3
 """
-🧠 NANO AI v33 - ABJAD + CHARACTER REASONING CORE
-Letter-level understanding + language decomposition
+🧠 NANO AI FULL PROJECT (SINGLE FILE VERSION)
+- Agent System
+- Memory Engine
+- Vector Search
+- Intent System
+- Command AI
+- Plugin Simulator
+- CLI Runner
 """
 
 import os
 import json
+import math
 import subprocess
-import importlib
 from datetime import datetime
 
-
-# ==========================
-# 🧠 MAIN BRAIN
-# ==========================
-class NanoBrain:
-
+# =========================
+# MEMORY CORE (memory.py)
+# =========================
+class Memory:
     def __init__(self):
-        self.memory = []
-        self.plugins = {}
-        self.task_queue = []
+        self.data = []
+        self.load()
 
-        self.version = "v33"
+    def load(self):
+        try:
+            self.data = json.load(open("memory.json"))
+        except:
+            self.data = []
 
-        self.conversation_history = []
+    def save(self):
+        json.dump(self.data[-2000:], open("memory.json","w"))
 
-        # 5W1H (v29+)
-        self.w5h_map = {
-            "apa": "WHAT",
-            "siapa": "WHO",
-            "kenapa": "WHY",
-            "kapan": "WHEN",
-            "dimana": "WHERE",
-            "bagaimana": "HOW"
-        }
+    def add(self, inp, out):
+        self.data.append({
+            "input": inp,
+            "output": out,
+            "time": str(datetime.now())
+        })
+        self.save()
 
-        # KNOWLEDGE BASE (v32)
-        self.knowledge_base = {
-            "python": "bahasa pemrograman AI dan automation",
-            "ai": "kecerdasan buatan",
-            "termux": "terminal linux di android"
-        }
+# =========================
+# TOKENIZER (tokenizer.py)
+# =========================
+class Tokenizer:
+    def encode(self, text):
+        return text.lower().split()
 
-        self.learned_knowledge = {}
+# =========================
+# VECTOR ENGINE (vector.py)
+# =========================
+class VectorEngine:
+    def embed(self, text):
+        vec = {}
+        for w in text.lower().split():
+            vec[w] = vec.get(w, 0) + 1
+        return vec
 
-        self.commands = {}
-        self.register_commands()
+    def cosine(self, a, b):
+        keys = set(a) | set(b)
 
-        self.load_memory()
-        self.load_plugins()
+        dot = sum(a.get(k,0)*b.get(k,0) for k in keys)
+        ma = math.sqrt(sum(v*v for v in a.values()))
+        mb = math.sqrt(sum(v*v for v in b.values()))
 
-        print("\n🧠 NANO AI v33 ABJAD CORE")
-        print("⚡ Character-Level Understanding Active\n")
+        if ma == 0 or mb == 0:
+            return 0
 
-    # ==========================
-    # SHELL
-    # ==========================
+        return dot / (ma * mb)
+
+# =========================
+# INTENT SYSTEM (intent.py)
+# =========================
+class Intent:
+    def detect(self, text):
+        text = text.lower()
+
+        if "halo" in text:
+            return "greeting"
+
+        if "hitung" in text or "calc" in text:
+            return "calc"
+
+        if "memory" in text:
+            return "memory"
+
+        return "chat"
+
+# =========================
+# COMMAND AI (command_ai.py)
+# =========================
+class CommandAI:
     def run(self, cmd):
         return subprocess.getoutput(cmd)
 
-    # ==========================
-    # COMMANDS
-    # ==========================
-    def register_commands(self):
+# =========================
+# AGENT (agent.py)
+# =========================
+class Agent:
+    def __init__(self):
+        self.memory = Memory()
+        self.vector = VectorEngine()
+        self.intent = Intent()
+        self.tokenizer = Tokenizer()
+        self.cmd = CommandAI()
 
-        self.commands = {
-            "plan": self.cmd_plan,
-            "run": self.cmd_run,
-            "memory": self.cmd_memory,
-            "status": self.cmd_status,
-        }
+    # SEARCH MEMORY
+    def search(self, query):
+        qv = self.vector.embed(query)
 
-    # ==========================
-    # MEMORY
-    # ==========================
-    def load_memory(self):
-        try:
-            self.memory = json.load(open("memory.json"))
-        except:
-            self.memory = []
+        best = None
+        best_score = 0
 
-    def save_memory(self):
-        json.dump(self.memory[-1200:], open("memory.json","w"))
+        for item in self.memory.data:
+            iv = self.vector.embed(item["input"])
+            score = self.vector.cosine(qv, iv)
 
-    # ==========================
-    # PLUGINS
-    # ==========================
-    def load_plugins(self):
+            if query in item["input"]:
+                score += 0.2
 
-        self.plugins = {}
+            if score > best_score:
+                best_score = score
+                best = item["output"]
 
-        for folder in ["core", "Plugins"]:
-            if not os.path.exists(folder):
-                continue
-
-            for file in os.listdir(folder):
-                if file.endswith(".py"):
-                    module = f"{folder}.{file[:-3]}"
-
-                    try:
-                        self.plugins[module] = importlib.import_module(module)
-                    except:
-                        pass
-
-        print(f"🔌 plugins: {len(self.plugins)}")
-
-    # ==========================
-    # BASIC COMMANDS
-    # ==========================
-    def cmd_plan(self, args):
-        task = " ".join(args)
-
-        self.task_queue.append({
-            "task": task,
-            "status": "queued"
-        })
-
-        return f"planned: {task}"
-
-    def cmd_run(self, args):
-        if not self.task_queue:
-            return "no tasks"
-
-        task = self.task_queue.pop(0)
-        return f"executed: {task['task']}"
-
-    def cmd_memory(self, args):
-        if not args:
-            return "memory <query>"
-
-        q = args[0]
-
-        return [m for m in self.memory if q in m["input"]][-5:]
-
-    def cmd_status(self, args):
-        return {
-            "version": self.version,
-            "memory": len(self.memory),
-            "learned": len(self.learned_knowledge)
-        }
-
-    # ==========================
-    # 🧠 ABJAD CORE (NEW)
-    # ==========================
-    def analyze_letters(self, text):
-
-        letters = list(text.lower())
-
-        vowels = "aiueo"
-        v = [c for c in letters if c in vowels]
-        c = [c for c in letters if c.isalpha() and c not in vowels]
-
-        return {
-            "text": text,
-            "letters": letters,
-            "vowels": v,
-            "consonants": c,
-            "length": len(letters)
-        }
-
-    # ==========================
-    # 🧠 WORD BREAKDOWN (NEW CORE)
-    # ==========================
-    def word_decomposition(self, text):
-
-        words = text.split()
-
-        result = []
-
-        for w in words:
-            result.append({
-                "word": w,
-                "chars": list(w),
-                "count": len(w)
-            })
-
-        return result
-
-    # ==========================
-    # CONTEXT
-    # ==========================
-    def update_context(self, text):
-        self.conversation_history.append(text)
-        self.conversation_history = self.conversation_history[-5:]
-
-    # ==========================
-    # 5W1H
-    # ==========================
-    def detect_5w1h(self, text):
-
-        text = text.lower()
-
-        for k in self.w5h_map:
-            if k in text:
-                return self.w5h_map[k]
+        if best_score > 0.3:
+            return best
 
         return None
 
-    # ==========================
-    # KNOWLEDGE LOOKUP
-    # ==========================
-    def knowledge_lookup(self, text):
+    # GENERATOR
+    def generate(self, text):
+        return f"🧠 Nano AI memahami: {text}"
 
-        text = text.lower()
+    # MAIN PIPELINE
+    def run(self, text):
 
-        for k in self.knowledge_base:
-            if k in text:
-                return self.knowledge_base[k]
-
-        for k in self.learned_knowledge:
-            if k in text:
-                return self.learned_knowledge[k]
-
-        return None
-
-    # ==========================
-    # RESPONSE ENGINE (UPGRADED)
-    # ==========================
-    def generate_response(self, text):
-
-        self.update_context(text)
-
-        text_l = text.lower()
+        intent = self.intent.detect(text)
 
         # GREETING
-        if "halo" in text_l:
-            return "👋 Halo! Aku Nano AI v33 dengan abjad reasoning."
+        if intent == "greeting":
+            return "👋 Halo, saya Nano AI Full Project"
 
-        # 🧠 ABJAD REQUEST DETECT
-        if "abjad" in text_l or "huruf" in text_l:
+        # CALC TOOL
+        if intent == "calc":
+            try:
+                return str(eval(text.replace("hitung","")))
+            except:
+                return "error"
 
-            analysis = self.analyze_letters(text)
+        # MEMORY SEARCH
+        mem = self.search(text)
+        if mem:
+            return mem
 
-            return (
-                "🧠 ABJAD ANALYSIS:\n"
-                f"- Huruf: {analysis['letters']}\n"
-                f"- Vokal: {analysis['vowels']}\n"
-                f"- Konsonan: {analysis['consonants']}\n"
-                f"- Total: {analysis['length']}"
-            )
+        # GENERATE
+        out = self.generate(text)
 
-        # WORD BREAKDOWN MODE
-        if "kata" in text_l or "pecah" in text_l:
+        self.memory.add(text, out)
 
-            return {
-                "decomposition": self.word_decomposition(text)
-            }
+        return out
 
-        # 5W1H
-        if self.detect_5w1h(text):
-            return self.knowledge_lookup(text) or "🧠 butuh data tambahan"
+# =========================
+# PLUGIN SYSTEM (simulasi Plugins/)
+# =========================
+class PluginSystem:
+    def __init__(self):
+        self.plugins = {}
 
-        # KNOWLEDGE
-        kb = self.knowledge_lookup(text)
-        if kb:
-            return f"🧠 PENJELASAN:\n{kb}"
+    def load(self):
+        # simulasi plugin
+        self.plugins["network"] = "active"
+        self.plugins["system"] = "active"
+        self.plugins["tts"] = "active"
+        self.plugins["voice"] = "active"
 
-        return "🤖 aku masih belajar memahami kata ini"
+# =========================
+# REPL (cli/runner.py)
+# =========================
+class CLI:
+    def __init__(self):
+        self.agent = Agent()
+        self.plugins = PluginSystem()
+        self.plugins.load()
 
-    # ==========================
-    # REASON ENGINE
-    # ==========================
-    def reason(self, text):
-
-        parts = text.lower().split()
-
-        if parts and parts[0] in self.commands:
-            return self.commands[parts[0]](parts[1:])
-
-        return self.generate_response(text)
-
-    # ==========================
-    # MAIN LOOP
-    # ==========================
-    def start(self):
-
-        print("\n🧠 v33 READY (abjad reasoning active)\n")
+    def run(self):
+        print("\n🧠 NANO AI FULL PROJECT (SINGLE FILE)")
+        print("⚡ Agent + Memory + Vector + Intent System\n")
 
         while True:
-            try:
-                user = input("nano> ")
+            q = input("nano> ")
 
-                if user in ["exit", "quit"]:
-                    break
-
-                out = self.reason(user)
-                print(out)
-
-                self.memory.append({
-                    "input": user,
-                    "output": str(out),
-                    "time": str(datetime.now())
-                })
-
-                self.save_memory()
-
-            except KeyboardInterrupt:
+            if q in ["exit","quit"]:
                 break
 
+            print(self.agent.run(q))
 
-# ==========================
-# RUN
-# ==========================
+# =========================
+# MAIN
+# =========================
 if __name__ == "__main__":
-    NanoBrain().start()
+    CLI().run()
