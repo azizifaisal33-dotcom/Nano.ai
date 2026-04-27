@@ -201,5 +201,4 @@ if __name__ == "__main__":
     main()
 EOF
 
-chmod +x brain.py
 ./brain.py
