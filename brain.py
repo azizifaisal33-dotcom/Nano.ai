@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-🧠 NANO AI v21 - SELF OPTIMIZING CORE
-Priority engine + adaptive memory + performance loop
+🧠 NANO AI v26 - MULTI AGENT SWARM CORE
+Planner + Analyst + Executor voting system
 """
 
 import os
-import time
+import json
 import subprocess
 import importlib
-import json
-import threading
 from datetime import datetime
 
 
@@ -22,15 +20,12 @@ class NanoBrain:
         self.memory = []
         self.plugins = {}
         self.task_queue = []
-        self.running = True
 
-        self.performance_log = {
-            "tasks_done": 0,
-            "tasks_failed": 0,
-            "avg_time": 0
-        }
+        self.version = "v26"
 
-        self.version = "v21"
+        # GRAPH + LEARNING (from v24-v25)
+        self.graph = {}
+        self.learning_log = {"good": 0, "bad": 0, "avg_score": 0}
 
         self.commands = {}
         self.register_commands()
@@ -38,12 +33,8 @@ class NanoBrain:
         self.load_memory()
         self.load_plugins()
 
-        self.worker = threading.Thread(target=self.background_loop)
-        self.worker.daemon = True
-        self.worker.start()
-
-        print("\n🧠 NANO AI v21 SELF-OPTIMIZING CORE")
-        print("⚡ Priority Engine + Adaptive Memory + Loop\n")
+        print("\n🧠 NANO AI v26 SWARM CORE")
+        print("⚡ Multi-Agent + Voting System\n")
 
     # ==========================
     # SHELL
@@ -59,10 +50,9 @@ class NanoBrain:
         self.commands = {
             "plan": self.cmd_plan,
             "run": self.cmd_run,
-            "tasks": self.cmd_tasks,
-            "status": self.cmd_status,
             "memory": self.cmd_memory,
-            "optimize": self.cmd_optimize,
+            "status": self.cmd_status,
+            "swarm": self.cmd_swarm_test,
         }
 
     # ==========================
@@ -75,7 +65,7 @@ class NanoBrain:
             self.memory = []
 
     def save_memory(self):
-        json.dump(self.memory[-600:], open("memory.json","w"))
+        json.dump(self.memory[-900:], open("memory.json","w"))
 
     # ==========================
     # PLUGINS
@@ -100,57 +90,19 @@ class NanoBrain:
         print(f"🔌 plugins: {len(self.plugins)}")
 
     # ==========================
-    # PLANNER (WITH PRIORITY)
+    # BASIC COMMANDS
     # ==========================
     def cmd_plan(self, args):
 
         task = " ".join(args)
 
-        priority = self.calculate_priority(task)
-
-        plan = {
+        self.task_queue.append({
             "task": task,
-            "steps": [
-                "analyze",
-                "execute",
-                "verify"
-            ],
-            "priority": priority,
-            "status": "queued",
-            "created": str(datetime.now())
-        }
+            "status": "queued"
+        })
 
-        self.task_queue.append(plan)
+        return f"planned: {task}"
 
-        self.sort_tasks()
-
-        return plan
-
-    # ==========================
-    # PRIORITY ENGINE
-    # ==========================
-    def calculate_priority(self, task):
-
-        score = 0
-
-        if "error" in task or "fix" in task:
-            score += 5
-
-        if "install" in task:
-            score += 3
-
-        if "github" in task:
-            score += 2
-
-        return score
-
-    def sort_tasks(self):
-
-        self.task_queue.sort(key=lambda x: x["priority"], reverse=True)
-
-    # ==========================
-    # RUN TASK
-    # ==========================
     def cmd_run(self, args):
 
         if not self.task_queue:
@@ -158,36 +110,8 @@ class NanoBrain:
 
         task = self.task_queue.pop(0)
 
-        start = time.time()
+        return f"executed: {task['task']}"
 
-        results = []
-
-        try:
-            for step in task["steps"]:
-                results.append(self.safe_execute(step))
-
-            task["status"] = "done"
-            self.performance_log["tasks_done"] += 1
-
-        except:
-            task["status"] = "failed"
-            self.performance_log["tasks_failed"] += 1
-
-        end = time.time()
-
-        self.update_avg_time(end - start)
-
-        return results
-
-    # ==========================
-    # TASK LIST
-    # ==========================
-    def cmd_tasks(self, args):
-        return self.task_queue
-
-    # ==========================
-    # MEMORY SEARCH (WEIGHTED)
-    # ==========================
     def cmd_memory(self, args):
 
         if not args:
@@ -195,20 +119,8 @@ class NanoBrain:
 
         q = args[0]
 
-        scored = []
+        return [m for m in self.memory if q in m["input"]][-5:]
 
-        for m in self.memory:
-            weight = m.get("weight", 1)
-            if q in m["input"]:
-                scored.append((weight, m))
-
-        scored.sort(reverse=True, key=lambda x: x[0])
-
-        return [m for w, m in scored[:5]]
-
-    # ==========================
-    # STATUS
-    # ==========================
     def cmd_status(self, args):
 
         return {
@@ -216,95 +128,118 @@ class NanoBrain:
             "memory": len(self.memory),
             "plugins": len(self.plugins),
             "tasks": len(self.task_queue),
-            "performance": self.performance_log
+            "learning": self.learning_log
         }
 
     # ==========================
-    # AUTO OPTIMIZE ENGINE
+    # 🧠 AGENTS (NEW CORE)
     # ==========================
-    def cmd_optimize(self, args):
 
-        avg = self.performance_log["avg_time"]
+    def agent_planner(self, text):
+        return f"[Planner] task breakdown: {text} -> steps generated"
 
-        if avg > 2:
-            suggestion = "reduce subprocess calls"
-        else:
-            suggestion = "system stable"
+    def agent_analyst(self, text):
+        return f"[Analyst] interpreting: {text} -> meaning extracted"
+
+    def agent_executor(self, text):
+        return f"[Executor] executing logic for: {text}"
+
+    # ==========================
+    # 🧠 SWARM SYSTEM (VOTING)
+    # ==========================
+    def swarm(self, text):
+
+        responses = [
+            self.agent_planner(text),
+            self.agent_analyst(text),
+            self.agent_executor(text)
+        ]
+
+        # simple voting: longest + most detailed wins
+        best = max(responses, key=lambda x: len(x))
 
         return {
-            "avg_time": avg,
-            "suggestion": suggestion
+            "all": responses,
+            "best": best
         }
 
     # ==========================
-    # SAFE EXECUTION
+    # 🧠 GRAPH UPDATE
     # ==========================
-    def safe_execute(self, step):
+    def update_graph(self, text):
 
-        blacklist = ["rm", "dd", "shutdown"]
+        words = text.lower().split()
 
-        for b in blacklist:
-            if b in step:
-                return "blocked"
+        for w in words:
+            if w not in self.graph:
+                self.graph[w] = set()
 
-        return f"executed: {step}"
-
-    # ==========================
-    # PERFORMANCE TRACKING
-    # ==========================
-    def update_avg_time(self, new_time):
-
-        old = self.performance_log["avg_time"]
-
-        self.performance_log["avg_time"] = (old + new_time) / 2
+            for o in words:
+                if o != w:
+                    self.graph[w].add(o)
 
     # ==========================
-    # BACKGROUND LOOP (OPTIMIZER)
+    # 🧠 RESPONSE ENGINE
     # ==========================
-    def background_loop(self):
+    def generate_response(self, text):
 
-        while self.running:
+        if "halo" in text.lower():
+            return "👋 Halo, aku Nano AI v26 Swarm Brain"
 
-            # auto re-sort tasks
-            self.sort_tasks()
+        if "apa kamu" in text.lower():
+            return "🧠 Aku multi-agent AI dengan planner, analyst, executor"
 
-            # adaptive memory weighting
-            for m in self.memory[-50:]:
-                m["weight"] = m.get("weight", 1) + 0.1
-
-            time.sleep(3)
+        return None
 
     # ==========================
-    # REASON ENGINE
+    # 🧠 REASON ENGINE (UPDATED)
     # ==========================
     def reason(self, text):
+
+        self.update_graph(text)
 
         parts = text.lower().split()
 
         if parts and parts[0] in self.commands:
             return self.commands[parts[0]](parts[1:])
 
-        if "plan" in text:
-            return self.cmd_plan(parts[1:])
+        # SWARM MODE (NEW CORE)
+        swarm_result = self.swarm(text)
 
-        if "run" in text:
-            return self.cmd_run([])
+        base_response = self.generate_response(text)
 
-        return f"unknown: {text}"
+        if base_response:
+            return base_response
+
+        return (
+            "🧠 SWARM ANALYSIS:\n"
+            f"- Planner: {swarm_result['all'][0]}\n"
+            f"- Analyst: {swarm_result['all'][1]}\n"
+            f"- Executor: {swarm_result['all'][2]}\n\n"
+            f"🏆 BEST: {swarm_result['best']}"
+        )
+
+    # ==========================
+    # SWARM TEST COMMAND
+    # ==========================
+    def cmd_swarm_test(self, args):
+
+        text = " ".join(args)
+
+        return self.swarm(text)
 
     # ==========================
     # MAIN LOOP
     # ==========================
     def start(self):
 
-        print("\n🧠 v21 READY (self-optimizing)\n")
+        print("\n🧠 v26 READY (multi-agent swarm)\n")
 
-        while self.running:
+        while True:
             try:
                 user = input("nano> ")
 
                 if user in ["exit", "quit"]:
-                    self.running = False
                     break
 
                 out = self.reason(user)
@@ -313,14 +248,12 @@ class NanoBrain:
                 self.memory.append({
                     "input": user,
                     "output": str(out),
-                    "time": str(datetime.now()),
-                    "weight": 1
+                    "time": str(datetime.now())
                 })
 
                 self.save_memory()
 
             except KeyboardInterrupt:
-                self.running = False
                 break
 
 
