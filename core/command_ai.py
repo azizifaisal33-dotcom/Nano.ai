@@ -3,48 +3,34 @@ import re
 class CommandAI:
 
     def generate(self, text):
-        t = text.lower()
-
+        t = text.lower().strip()
         cmds = []
 
-        # mapping dasar
+        name = self._extract_name(t)
+
         if "buka storage" in t:
             cmds += [
                 "termux-setup-storage",
                 "ls ~/storage",
-                "cd ~/storage"
+                "cd ~/storage/shared"
             ]
 
-        if "lihat file" in t or "list file" in t:
-            cmds += ["ls", "ls -la"]
+        if any(x in t for x in ["lihat file", "list file", "cek file"]):
+            cmds += ["ls", "ls -la", "ls -lh"]
 
-        if "hapus file" in t:
-            name = self._extract_name(t)
-            if name:
-                cmds += [f"rm {name}", f"rm -f {name}"]
+        if "buat file" in t and name:
+            cmds += [
+                f"touch {name}",
+                f"echo '' > {name}"
+            ]
 
-        if "buat file" in t:
-            name = self._extract_name(t)
-            if name:
-                cmds += [f"touch {name}", f"echo '' > {name}"]
+        if "hapus file" in t and name:
+            cmds += [
+                f"rm {name}",
+                f"rm -f {name}"
+            ]
 
-        if "install" in t:
-            pkg = self._extract_name(t)
-            if pkg:
-                cmds += [
-                    f"pkg install {pkg} -y",
-                    f"apt install {pkg} -y"
-                ]
-
-        # fallback → pakai teks asli
-        if not cmds:
-            cmds.append(text)
-
-        return cmds
-
-    def _extract_name(self, text):
-        words = text.split()
-        for w in words[::-1]:
-            if "." in w or w.isalpha():
-                return w
-        return None
+        if "install" in t and name:
+            cmds += [
+                f"pkg install {name} -y",
+                f"apt install {name
