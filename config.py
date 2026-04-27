@@ -1,26 +1,17 @@
-import os
+def find_model(self):
+    paths = [
+        "./models/model.gguf",
+        "./model.gguf"
+    ]
 
+    for p in paths:
+        if os.path.exists(p):
+            return p
 
-class Config:
-    def __init__(self):
-        self.debug = True
-        self.model_path = self.find_model()
+    # 🔥 TAMBAHAN: folder llm
+    if os.path.isdir("./llm"):
+        for f in os.listdir("./llm"):
+            if f.endswith(".gguf"):
+                return os.path.join("./llm", f)
 
-    def find_model(self):
-        # prioritas file langsung
-        if os.path.exists("./models/model.gguf"):
-            return "./models/model.gguf"
-
-        if os.path.exists("./model.gguf"):
-            return "./model.gguf"
-
-        # scan folder models
-        if os.path.isdir("./models"):
-            for f in os.listdir("./models"):
-                if f.endswith(".gguf"):
-                    return os.path.join("./models", f)
-
-        return None
-
-
-config = Config()
+    return None
