@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🧠 NANO AI v28 - CONVERSATION FLOW CORE
-Context state + follow-up understanding + dialogue flow
+🧠 NANO AI v33 - ABJAD + CHARACTER REASONING CORE
+Letter-level understanding + language decomposition
 """
 
 import os
@@ -21,23 +21,28 @@ class NanoBrain:
         self.plugins = {}
         self.task_queue = []
 
-        self.version = "v28"
+        self.version = "v33"
 
-        # GRAPH + LANGUAGE (from previous versions)
-        self.graph = {}
-
-        # 🧠 CONVERSATION STATE (NEW CORE)
         self.conversation_history = []
-        self.current_topic = None
 
-        self.basic_knowledge = {
-            "siapa": "identitas",
-            "apa": "penjelasan",
-            "kenapa": "alasan",
-            "kamu": "AI",
-            "aku": "user",
-            "halo": "sapaan"
+        # 5W1H (v29+)
+        self.w5h_map = {
+            "apa": "WHAT",
+            "siapa": "WHO",
+            "kenapa": "WHY",
+            "kapan": "WHEN",
+            "dimana": "WHERE",
+            "bagaimana": "HOW"
         }
+
+        # KNOWLEDGE BASE (v32)
+        self.knowledge_base = {
+            "python": "bahasa pemrograman AI dan automation",
+            "ai": "kecerdasan buatan",
+            "termux": "terminal linux di android"
+        }
+
+        self.learned_knowledge = {}
 
         self.commands = {}
         self.register_commands()
@@ -45,8 +50,8 @@ class NanoBrain:
         self.load_memory()
         self.load_plugins()
 
-        print("\n🧠 NANO AI v28 CONVERSATION FLOW CORE")
-        print("⚡ Context State + Dialogue Flow Engine\n")
+        print("\n🧠 NANO AI v33 ABJAD CORE")
+        print("⚡ Character-Level Understanding Active\n")
 
     # ==========================
     # SHELL
@@ -76,7 +81,7 @@ class NanoBrain:
             self.memory = []
 
     def save_memory(self):
-        json.dump(self.memory[-1000:], open("memory.json","w"))
+        json.dump(self.memory[-1200:], open("memory.json","w"))
 
     # ==========================
     # PLUGINS
@@ -132,103 +137,126 @@ class NanoBrain:
         return {
             "version": self.version,
             "memory": len(self.memory),
-            "plugins": len(self.plugins),
-            "tasks": len(self.task_queue),
-            "topic": self.current_topic
+            "learned": len(self.learned_knowledge)
         }
 
     # ==========================
-    # 🧠 UPDATE CONTEXT STATE
+    # 🧠 ABJAD CORE (NEW)
     # ==========================
-    def update_context(self, text):
+    def analyze_letters(self, text):
 
-        self.conversation_history.append(text)
+        letters = list(text.lower())
 
-        # keep last 5 messages only
-        self.conversation_history = self.conversation_history[-5:]
+        vowels = "aiueo"
+        v = [c for c in letters if c in vowels]
+        c = [c for c in letters if c.isalpha() and c not in vowels]
 
-        # detect topic
-        words = text.lower().split()
+        return {
+            "text": text,
+            "letters": letters,
+            "vowels": v,
+            "consonants": c,
+            "length": len(letters)
+        }
+
+    # ==========================
+    # 🧠 WORD BREAKDOWN (NEW CORE)
+    # ==========================
+    def word_decomposition(self, text):
+
+        words = text.split()
+
+        result = []
 
         for w in words:
-            if w in self.basic_knowledge:
-                self.current_topic = w
+            result.append({
+                "word": w,
+                "chars": list(w),
+                "count": len(w)
+            })
+
+        return result
 
     # ==========================
-    # 🧠 FOLLOW-UP DETECTION
+    # CONTEXT
     # ==========================
-    def is_follow_up(self, text):
-
-        follow_words = ["itu", "lanjut", "jelaskan", "terus", "lagi"]
-
-        return any(w in text.lower() for w in follow_words)
+    def update_context(self, text):
+        self.conversation_history.append(text)
+        self.conversation_history = self.conversation_history[-5:]
 
     # ==========================
-    # 🧠 CONTEXT ANALYSIS
+    # 5W1H
     # ==========================
-    def get_context(self):
+    def detect_5w1h(self, text):
 
-        if not self.conversation_history:
-            return None
+        text = text.lower()
 
-        return self.conversation_history[-2:]
+        for k in self.w5h_map:
+            if k in text:
+                return self.w5h_map[k]
+
+        return None
 
     # ==========================
-    # 🧠 RESPONSE ENGINE
+    # KNOWLEDGE LOOKUP
+    # ==========================
+    def knowledge_lookup(self, text):
+
+        text = text.lower()
+
+        for k in self.knowledge_base:
+            if k in text:
+                return self.knowledge_base[k]
+
+        for k in self.learned_knowledge:
+            if k in text:
+                return self.learned_knowledge[k]
+
+        return None
+
+    # ==========================
+    # RESPONSE ENGINE (UPGRADED)
     # ==========================
     def generate_response(self, text):
 
         self.update_context(text)
 
+        text_l = text.lower()
+
         # GREETING
-        if "halo" in text.lower():
-            return "👋 Halo! Aku Nano AI v28 dengan conversation flow."
+        if "halo" in text_l:
+            return "👋 Halo! Aku Nano AI v33 dengan abjad reasoning."
 
-        # FOLLOW UP HANDLING (NEW CORE)
-        if self.is_follow_up(text):
+        # 🧠 ABJAD REQUEST DETECT
+        if "abjad" in text_l or "huruf" in text_l:
 
-            ctx = self.get_context()
+            analysis = self.analyze_letters(text)
 
-            if ctx:
-                return (
-                    "🧠 Aku melanjutkan percakapan sebelumnya:\n"
-                    f"- {ctx[-1]}\n\n"
-                    "💡 Aku akan mencoba menjelaskan lebih lanjut."
-                )
+            return (
+                "🧠 ABJAD ANALYSIS:\n"
+                f"- Huruf: {analysis['letters']}\n"
+                f"- Vokal: {analysis['vowels']}\n"
+                f"- Konsonan: {analysis['consonants']}\n"
+                f"- Total: {analysis['length']}"
+            )
 
-            return "🤖 Aku belum tahu konteks sebelumnya."
+        # WORD BREAKDOWN MODE
+        if "kata" in text_l or "pecah" in text_l:
 
-        # QUESTION
-        if "apa" in text.lower() or "siapa" in text.lower():
+            return {
+                "decomposition": self.word_decomposition(text)
+            }
 
-            if self.current_topic:
-                return f"🧠 Kamu menanyakan tentang '{self.current_topic}', aku akan menjelaskan itu."
+        # 5W1H
+        if self.detect_5w1h(text):
+            return self.knowledge_lookup(text) or "🧠 butuh data tambahan"
 
-            return "🤖 Itu pertanyaan, tapi aku butuh konteks lebih."
+        # KNOWLEDGE
+        kb = self.knowledge_lookup(text)
+        if kb:
+            return f"🧠 PENJELASAN:\n{kb}"
 
-        # DEFAULT
-        return self.smart_fallback(text)
-
-    # ==========================
-    # 🧠 SWARM (still kept)
-    # ==========================
-    def swarm(self, text):
-
-        return {
-            "planner": f"[Planner] {text}",
-            "analyst": f"[Analyst] {text}",
-            "executor": f"[Executor] {text}"
-        }
-
-    # ==========================
-    # FALLBACK
-    # ==========================
-    def smart_fallback(self, text):
-
-        if len(text.split()) < 3:
-            return "🤖 coba jelaskan lebih panjang"
-
-        return "🤖 aku masih mencoba memahami konteks percakapan ini"
+        return "🤖 aku masih belajar memahami kata ini"
 
     # ==========================
     # REASON ENGINE
@@ -247,7 +275,7 @@ class NanoBrain:
     # ==========================
     def start(self):
 
-        print("\n🧠 v28 READY (conversation flow active)\n")
+        print("\n🧠 v33 READY (abjad reasoning active)\n")
 
         while True:
             try:
