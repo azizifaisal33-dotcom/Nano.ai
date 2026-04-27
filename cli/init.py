@@ -1,7 +1,17 @@
 """
-💻 Nano CLI Framework
+💻 Nano CLI Framework v2
 """
-from .shell import NanoShell
-from .runner import main
+__version__ = "2.0.0"
 
-__all__ = ["NanoShell", "main"]
+# Lazy imports - Production style
+def get_shell(ai_instance):
+    from .shell import NanoShell
+    return NanoShell(ai_instance)
+
+def run_cli():
+    from .runner import main
+    main()
+
+__all__ = ["get_shell", "run_cli"]
+
+print("💻 CLI Framework loaded ✓")
