@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🧠 NANO AI v26 - MULTI AGENT SWARM CORE
-Planner + Analyst + Executor voting system
+🧠 NANO AI v28 - CONVERSATION FLOW CORE
+Context state + follow-up understanding + dialogue flow
 """
 
 import os
@@ -21,11 +21,23 @@ class NanoBrain:
         self.plugins = {}
         self.task_queue = []
 
-        self.version = "v26"
+        self.version = "v28"
 
-        # GRAPH + LEARNING (from v24-v25)
+        # GRAPH + LANGUAGE (from previous versions)
         self.graph = {}
-        self.learning_log = {"good": 0, "bad": 0, "avg_score": 0}
+
+        # 🧠 CONVERSATION STATE (NEW CORE)
+        self.conversation_history = []
+        self.current_topic = None
+
+        self.basic_knowledge = {
+            "siapa": "identitas",
+            "apa": "penjelasan",
+            "kenapa": "alasan",
+            "kamu": "AI",
+            "aku": "user",
+            "halo": "sapaan"
+        }
 
         self.commands = {}
         self.register_commands()
@@ -33,8 +45,8 @@ class NanoBrain:
         self.load_memory()
         self.load_plugins()
 
-        print("\n🧠 NANO AI v26 SWARM CORE")
-        print("⚡ Multi-Agent + Voting System\n")
+        print("\n🧠 NANO AI v28 CONVERSATION FLOW CORE")
+        print("⚡ Context State + Dialogue Flow Engine\n")
 
     # ==========================
     # SHELL
@@ -52,7 +64,6 @@ class NanoBrain:
             "run": self.cmd_run,
             "memory": self.cmd_memory,
             "status": self.cmd_status,
-            "swarm": self.cmd_swarm_test,
         }
 
     # ==========================
@@ -65,7 +76,7 @@ class NanoBrain:
             self.memory = []
 
     def save_memory(self):
-        json.dump(self.memory[-900:], open("memory.json","w"))
+        json.dump(self.memory[-1000:], open("memory.json","w"))
 
     # ==========================
     # PLUGINS
@@ -93,7 +104,6 @@ class NanoBrain:
     # BASIC COMMANDS
     # ==========================
     def cmd_plan(self, args):
-
         task = " ".join(args)
 
         self.task_queue.append({
@@ -104,16 +114,13 @@ class NanoBrain:
         return f"planned: {task}"
 
     def cmd_run(self, args):
-
         if not self.task_queue:
             return "no tasks"
 
         task = self.task_queue.pop(0)
-
         return f"executed: {task['task']}"
 
     def cmd_memory(self, args):
-
         if not args:
             return "memory <query>"
 
@@ -122,118 +129,125 @@ class NanoBrain:
         return [m for m in self.memory if q in m["input"]][-5:]
 
     def cmd_status(self, args):
-
         return {
             "version": self.version,
             "memory": len(self.memory),
             "plugins": len(self.plugins),
             "tasks": len(self.task_queue),
-            "learning": self.learning_log
+            "topic": self.current_topic
         }
 
     # ==========================
-    # 🧠 AGENTS (NEW CORE)
+    # 🧠 UPDATE CONTEXT STATE
     # ==========================
+    def update_context(self, text):
 
-    def agent_planner(self, text):
-        return f"[Planner] task breakdown: {text} -> steps generated"
+        self.conversation_history.append(text)
 
-    def agent_analyst(self, text):
-        return f"[Analyst] interpreting: {text} -> meaning extracted"
+        # keep last 5 messages only
+        self.conversation_history = self.conversation_history[-5:]
 
-    def agent_executor(self, text):
-        return f"[Executor] executing logic for: {text}"
-
-    # ==========================
-    # 🧠 SWARM SYSTEM (VOTING)
-    # ==========================
-    def swarm(self, text):
-
-        responses = [
-            self.agent_planner(text),
-            self.agent_analyst(text),
-            self.agent_executor(text)
-        ]
-
-        # simple voting: longest + most detailed wins
-        best = max(responses, key=lambda x: len(x))
-
-        return {
-            "all": responses,
-            "best": best
-        }
-
-    # ==========================
-    # 🧠 GRAPH UPDATE
-    # ==========================
-    def update_graph(self, text):
-
+        # detect topic
         words = text.lower().split()
 
         for w in words:
-            if w not in self.graph:
-                self.graph[w] = set()
+            if w in self.basic_knowledge:
+                self.current_topic = w
 
-            for o in words:
-                if o != w:
-                    self.graph[w].add(o)
+    # ==========================
+    # 🧠 FOLLOW-UP DETECTION
+    # ==========================
+    def is_follow_up(self, text):
+
+        follow_words = ["itu", "lanjut", "jelaskan", "terus", "lagi"]
+
+        return any(w in text.lower() for w in follow_words)
+
+    # ==========================
+    # 🧠 CONTEXT ANALYSIS
+    # ==========================
+    def get_context(self):
+
+        if not self.conversation_history:
+            return None
+
+        return self.conversation_history[-2:]
 
     # ==========================
     # 🧠 RESPONSE ENGINE
     # ==========================
     def generate_response(self, text):
 
+        self.update_context(text)
+
+        # GREETING
         if "halo" in text.lower():
-            return "👋 Halo, aku Nano AI v26 Swarm Brain"
+            return "👋 Halo! Aku Nano AI v28 dengan conversation flow."
 
-        if "apa kamu" in text.lower():
-            return "🧠 Aku multi-agent AI dengan planner, analyst, executor"
+        # FOLLOW UP HANDLING (NEW CORE)
+        if self.is_follow_up(text):
 
-        return None
+            ctx = self.get_context()
+
+            if ctx:
+                return (
+                    "🧠 Aku melanjutkan percakapan sebelumnya:\n"
+                    f"- {ctx[-1]}\n\n"
+                    "💡 Aku akan mencoba menjelaskan lebih lanjut."
+                )
+
+            return "🤖 Aku belum tahu konteks sebelumnya."
+
+        # QUESTION
+        if "apa" in text.lower() or "siapa" in text.lower():
+
+            if self.current_topic:
+                return f"🧠 Kamu menanyakan tentang '{self.current_topic}', aku akan menjelaskan itu."
+
+            return "🤖 Itu pertanyaan, tapi aku butuh konteks lebih."
+
+        # DEFAULT
+        return self.smart_fallback(text)
 
     # ==========================
-    # 🧠 REASON ENGINE (UPDATED)
+    # 🧠 SWARM (still kept)
+    # ==========================
+    def swarm(self, text):
+
+        return {
+            "planner": f"[Planner] {text}",
+            "analyst": f"[Analyst] {text}",
+            "executor": f"[Executor] {text}"
+        }
+
+    # ==========================
+    # FALLBACK
+    # ==========================
+    def smart_fallback(self, text):
+
+        if len(text.split()) < 3:
+            return "🤖 coba jelaskan lebih panjang"
+
+        return "🤖 aku masih mencoba memahami konteks percakapan ini"
+
+    # ==========================
+    # REASON ENGINE
     # ==========================
     def reason(self, text):
-
-        self.update_graph(text)
 
         parts = text.lower().split()
 
         if parts and parts[0] in self.commands:
             return self.commands[parts[0]](parts[1:])
 
-        # SWARM MODE (NEW CORE)
-        swarm_result = self.swarm(text)
-
-        base_response = self.generate_response(text)
-
-        if base_response:
-            return base_response
-
-        return (
-            "🧠 SWARM ANALYSIS:\n"
-            f"- Planner: {swarm_result['all'][0]}\n"
-            f"- Analyst: {swarm_result['all'][1]}\n"
-            f"- Executor: {swarm_result['all'][2]}\n\n"
-            f"🏆 BEST: {swarm_result['best']}"
-        )
-
-    # ==========================
-    # SWARM TEST COMMAND
-    # ==========================
-    def cmd_swarm_test(self, args):
-
-        text = " ".join(args)
-
-        return self.swarm(text)
+        return self.generate_response(text)
 
     # ==========================
     # MAIN LOOP
     # ==========================
     def start(self):
 
-        print("\n🧠 v26 READY (multi-agent swarm)\n")
+        print("\n🧠 v28 READY (conversation flow active)\n")
 
         while True:
             try:
