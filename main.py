@@ -13,12 +13,8 @@ if __name__ == "__main__":
                 print("bye")
                 break
 
-            response = brain.think(user)
-            print("\n🧠 AI:\n", response, "\n")
+            print("\n🧠 AI:\n", brain.think(user), "\n")
 
         except KeyboardInterrupt:
             print("\nbye")
-            break
-
-        except Exception as e:
-            print("⚠️ error:", e)
+            break e)
