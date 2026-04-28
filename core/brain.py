@@ -15,6 +15,45 @@ from core.generator import NanoGenerator
 # SAFE SYSTEM
 # =========================
 class FileSystem:
+
+def think(self, text):
+    text = text.strip()
+    if not text: return "Kosong nih 😅"
+
+    print(f"🧠 Thinking... ({text[:30]}...)")
+
+    # 1. DNA EVOLUTION FIRST (REVOLVER)
+    if text.lower().startswith("evolve"):
+        parts = text.split(" ", 2)
+        if len(parts) >= 3:
+            return self.revolver.evolve(parts[1], parts[2])
+        return "Format: evolve <file> <instruction>"
+
+    # 2. AGENT MODE
+    if text.lower().startswith("agent"):
+        return self.agent.start(text[6:].strip())
+
+    # 3. KNOWLEDGE + MEMORY (BEFORE COMMAND!)
+    kb = search_knowledge(text)
+    if kb: return f"📚 {kb}"
+    
+    mem = memory.search(text)
+    if mem: return f"💾 {mem[0]['ai_response']}"
+
+    # 4. CHAT FALLBACK (BEFORE COMMAND AI!)
+    chat_response = self.chat(text)
+    if "belum paham" not in chat_response.lower():
+        return chat_response
+
+    # 5. COMMAND AI (LAST RESORT)
+    commands = self.cmd_ai.generate(text)
+    safe_cmds = [safe_command(c) for c in commands if safe_command(c)]
+    if safe_cmds:
+        return f"💻 Saran:\n" + "\n".join(f"  {i+1}. {c}" for i,c in enumerate(safe_cmds[:3]))
+
+    # 6. GENERATOR
+    return self.generator.reply(text)
+
     def read(self, path):
         try:
             with open(path, "r", encoding="utf-8") as f:
