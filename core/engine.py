@@ -1,34 +1,25 @@
-from config import config
-import subprocess
 import os
 
+class NanoConfig:
+    def __init__(self):
+        self.AGENT_NAME = "NanoAI"
+        self.OWNER_NAME = "Yeshie"
+        
+        self.MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
+        self.USE_SAFETENSORS = True
+        
+        self.CONTEXT_WINDOW = 2048
+        self.MAX_NEW_TOKENS = 512
+        self.TEMPERATURE = 0.7
+        
+        self.ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+        self.DB_PATH = os.path.join(self.ROOT_DIR, "data", "memory", "system.json")
 
-class Engine:
-    def run(self, cmd):
-        """
-        cmd = string command dari AI system
-        """
+    def get_system_prompt(self):
+        return (
+            f"Role: {self.AGENT_NAME}. Owner: {self.OWNER_NAME}. "
+            "Expertise: Android (Sketchware Pro), Bash, Firebase. "
+            "Style: Technical, casual, concise."
+        )
 
-        # contoh simple executor (aman)
-        try:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-
-            return {
-                "success": result.returncode == 0,
-                "output": result.stdout.strip() or result.stderr.strip()
-            }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "output": str(e)
-            }
-
-
-engine = Engine()
+config = NanoConfig()
