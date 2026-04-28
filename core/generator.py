@@ -35,7 +35,7 @@ class NanoGenerator:
             return
 
         # simpan kata awal
-        self.start_words.append(words[0])
+        self.start_words.append(words)
 
         for i in range(len(words) - 1):
             a, b = words[i], words[i + 1]
@@ -71,6 +71,12 @@ class NanoGenerator:
         text = self._clean(text)
         words = text.split()
 
-        start = words[0] if words else None
+        start = words if words else None
 
         return self.generate(start=start, length=12)
+
+# =========================
+# GLOBAL INSTANCE (WAJIB ADA)
+# =========================
+# Baris ini yang akan dipanggil oleh nano.py atau brain.py
+generator = NanoGenerator()
