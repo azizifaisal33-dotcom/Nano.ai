@@ -3,6 +3,17 @@ import os
 from core.brain import Brain
 
 class NanoShell:
+
+def __init__(self, brain=None):
+    os.makedirs("data", exist_ok=True)
+    os.makedirs("data/memory", exist_ok=True)
+    os.makedirs("data/knowledge", exist_ok=True)
+    
+    if brain is None:
+        self.brain = Brain()
+    else:
+        self.brain = brain
+
     def __init__(self, brain=None):  # ✅ FIXED: Accept brain param
         if brain is None:
             self.brain = Brain()
