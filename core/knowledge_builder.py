@@ -1,104 +1,89 @@
+#!/usr/bin/env python3
+import subprocess
 import re
-import hashlib
+import sqlite3
+import pickle
 from pathlib import Path
+from typing import List, Optional
 
+class AutonomousKnowledge:
+    def __init__(self):
+        self.kb_dir = Path("data/knowledge")
+        self.kb_dir.mkdir(exist_ok=True)
+        self.vector_db = self.kb_dir / "vector_db.sqlite"
+        self._init_db()
 
-# =========================
-# STORAGE PATH
-# =========================
-KB_PATH = Path("data/knowledge/base.txt")
-KB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    def _init_db(self):
+        """Self-creating vector database"""
+        conn = sqlite3.connect(self.vector_db)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS vectors (
+                id INTEGER PRIMARY KEY,
+                query TEXT,
+                response TEXT,
+                vector BLOB,
+                source TEXT,
+                timestamp REAL
+            )
+        """)
+        conn.commit()
+        conn.close()
 
+    def local_search(self, query: str) -> List[str]:
+        """Fast local lookup"""
+        conn = sqlite3.connect(self.vector_db)
+        cursor = conn.execute(
+            "SELECT response FROM vectors WHERE query LIKE ? ORDER BY timestamp DESC LIMIT 3",
+            (f"%{query}%",)
+        )
+        results = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return results
 
-# =========================
-# NORMALIZER
-# =========================
-def normalize(text):
-    text = text.lower().strip()
-    text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"[^\w\s]", "", text)
-    return text
+    def web_scrape(self, query: str) -> List[str]:
+        """Autonomous Google scrape"""
+        try:
+            # Raw curl google
+            cmd = f"curl -s -A 'NanoAI' 'https://www.google.com/search?q={query.replace(' ', '+')}'"
+            html = subprocess.getoutput(cmd)
+            
+            # Extract snippets
+            snippets = re.findall(r'<div class="[^"]*snippet[^"]*">(.*?)</div>', html, re.DOTALL)
+            urls = re.findall(r'<a href="/url\?q=([^&"]+)', html)
+            
+            knowledge = []
+            for i, (snippet, url) in enumerate(zip(snippets[:5], urls[:5])):
+                clean_snippet = re.sub(r'<[^>]+>', '', snippet)[:200]
+                knowledge.append(f"{clean_snippet} | {url}")
+            
+            # Auto-save to vector DB
+            self._save_knowledge(query, knowledge)
+            return knowledge[:3]
+            
+        except:
+            return ["Web search unavailable"]
 
+    def _save_knowledge(self, query: str, knowledge: List[str]):
+        """Tokenize & vectorize"""
+        conn = sqlite3.connect(self.vector_db)
+        vector = pickle.dumps([hash(w) for w in query.split()])  # Simple hash vector
+        
+        for item in knowledge[:3]:
+            conn.execute(
+                "INSERT INTO vectors (query, response, vector, source, timestamp) VALUES (?, ?, ?, 'web', ?)",
+                (query, item, vector, time.time())
+            )
+        conn.commit()
+        conn.close()
 
-# =========================
-# HASH (ANTI DUPLICATE)
-# =========================
-def make_key(q, a):
-    return hashlib.md5(f"{q}|{a}".encode()).hexdigest()
+    def search(self, query: str) -> str:
+        """Master search: local → web"""
+        local = self.local_search(query)
+        if local:
+            return f"💾 {local[0]}"
+        
+        web = self.web_scrape(query)
+        return f"🌐 {web[0] if web else 'No data'}"
 
-
-# =========================
-# VALIDATOR
-# =========================
-def is_valid(q, a):
-    blacklist = ["error", "gagal", "unknown", "none", "tidak tahu"]
-
-    if len(q) < 2 or len(a) < 2:
-        return False
-
-    if any(b in a.lower() for b in blacklist):
-        return False
-
-    if len(q) > 100 or len(a) > 300:
-        return False
-
-    return True
-
-
-# =========================
-# LOAD EXISTING KEYS
-# =========================
-def load_existing_keys():
-    keys = set()
-
-    if not KB_PATH.exists():
-        return keys
-
-    with open(KB_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            if "|" in line:
-                q, a = line.strip().split("|", 1)
-                keys.add(make_key(q, a))
-
-    return keys
-
-
-# =========================
-# SEARCH KNOWLEDGE
-# =========================
-def search_knowledge(text):
-    if not KB_PATH.exists():
-        return None
-
-    text = normalize(text)
-
-    with open(KB_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            if "|" in line:
-                q, a = line.strip().split("|", 1)
-                if q in text:
-                    return a
-
-    return None
-
-
-# =========================
-# ADD KNOWLEDGE (MAIN API)
-# =========================
-def add_knowledge(question, answer):
-    question = normalize(question)
-    answer = answer.strip()
-
-    if not is_valid(question, answer):
-        return False
-
-    key = make_key(question, answer)
-    existing = load_existing_keys()
-
-    if key in existing:
-        return False
-
-    with open(KB_PATH, "a", encoding="utf-8") as f:
-        f.write(f"{question}|{answer}\n")
-
-    return True
+# Global brain
+knowledge = AutonomousKnowledge()
