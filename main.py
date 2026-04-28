@@ -7,13 +7,14 @@ if __name__ == "__main__":
 
     while True:
         try:
-            user = input("you> ")
+            user = input("you> ").strip()
 
-            if user in ["exit", "quit"]:
+            if user.lower() in ["exit", "quit"]:
                 print("bye")
                 break
 
-            print("\n🧠 AI:\n", brain.think(user), "\n")
+            response = brain.think(user)
+            print("\n🧠 AI:\n", response, "\n")
 
         except KeyboardInterrupt:
             print("\nbye")
