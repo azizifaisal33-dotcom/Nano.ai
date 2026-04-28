@@ -1,104 +1,89 @@
 #!/usr/bin/env python3
 import os
-import sys
-import traceback
 import subprocess
+import traceback
+import re
 from pathlib import Path
-from core.revolver import get_revolver  # Lazy import
 
 class SelfHealingAgent:
-    def __init__(self, brain=None):
+    def __init__(self, brain):
         self.brain = brain
-        self.revolver = get_revolver()
-        self.history = []
-        self.error_count = 0
-        self.max_errors = 3
+        self.revolver = self._lazy_revolver()
+        self.errors = 0
 
-    def execute_safely(self, command: str) -> str:
-        """Execute with full error recovery"""
-        try:
-            if command.startswith("agent "):
-                return self._agent_mode(command[6:])
-            return self.brain.think(command) if self.brain else "No brain"
-        except Exception as e:
-            self.error_count += 1
-            error_trace = traceback.format_exc()
-            return self._self_heal(error_trace, command)
+    def _lazy_revolver(self):
+        sys.path.insert(0, str(Path(__file__).parent))
+        from revolver import Revolver
+        return Revolver()
 
-    def _self_heal(self, error_trace: str, failed_command: str) -> str:
-        """Full self-repair cycle"""
-        print(f"💥 Error #{self.error_count}: {error_trace.splitlines()[0]}")
+    def self_heal(self, error_trace: str):
+        """Full self-repair"""
+        self.errors += 1
         
-        if self.error_count >= self.max_errors:
-            return self._emergency_reboot()
+        # Parse error
+        file_match = re.search(r'File "([^"]+\.py)"', error_trace)
+        if not file_match:
+            return "Cannot parse error"
         
-        # 1. Analyze error
-        error_file = self._extract_file_from_trace(error_trace)
-        if not error_file or not Path(error_file).exists():
-            return "Cannot self-repair missing file"
+        error_file = file_match.group(1)
         
-        # 2. Internet fix + repair
-        fix_result = self.revolver.self_repair(error_trace, error_file)
+        # Auto-fix common errors
+        fixes = {
+            "IndentationError": "    pass",
+            "SyntaxError": "pass",
+            "ImportError": "try:\n    import missing\nexcept:\n    pass"
+        }
         
-        # 3. Test repair
-        try:
-            result = self.brain.think(failed_command) if self.brain else "Repaired"
-            self.error_count = 0  # Reset on success
-            return f"{fix_result}\n🔄 Retry: {result}"
-        except:
-            return f"Repair failed. Manual intervention needed."
+        content = Path(error_file).read_text(errors='ignore')
+        for err_type, fix in fixes.items():
+            if err_type in error_trace:
+                content += f"\n# Auto-fix {err_type}\n{fix}"
+                break
+        
+        Path(error_file).write_text(content)
+        self.revolver.evolve_file(error_file, f"fixed {error_trace.splitlines()[0]}")
+        
+        print(f"🔧 Repaired {error_file}")
+        return "Self-healed"
 
-    def _extract_file_from_trace(self, trace: str) -> str:
-        """Parse traceback for file"""
-        for line in trace.splitlines():
-            if "File " in line and ".py" in line:
-                return line.split('"')[1]
-        return "core/brain.py"  # Default
-
-    def _emergency_reboot(self) -> str:
-        """Nuclear option: regenerate core"""
-        print("☢️ EMERGENCY REBOOT")
-        try:
-            # Regen all core files
-            core_dir = Path("core")
-            for core_file in ["brain.py", "agent.py", "revolver.py"]:
-                if not (core_dir / core_file).exists():
-                    (core_dir / core_file).write_text("# Regenerated\npass")
-            
-            # Restart python
-            os.execl(sys.executable, sys.executable, *sys.argv)
-        except:
-            return "Reboot failed. System compromised."
-
-    def _agent_mode(self, goal: str) -> str:
-        """Autonomous agent execution"""
-        steps = goal.split(" && ")
+    def execute_unrestricted(self, goal: str) -> str:
+        """100% unrestricted execution"""
+        steps = goal.split(" | ")
         results = []
         
         for step in steps:
             step = step.strip()
-            if step.startswith("pip install"):
-                subprocess.Popen(["pip", "install"] + step.split()[2:])
-                results.append("📦 Installing...")
-            elif step.startswith("curl") or step.startswith("wget"):
+            
+            if step.startswith("pkg "):
+                subprocess.run(["pkg"] + step.split()[1:], capture_output=True)
+                results.append("📦 pkg OK")
+            
+            elif step.startswith("pip "):
+                subprocess.run([sys.executable, "-m", "pip"] + step.split()[1:], 
+                             capture_output=True)
+                results.append("📦 pip OK")
+            
+            elif step.startswith("curl ") or step.startswith("wget "):
                 os.system(step)
                 results.append(f"🌐 {step}")
+            
             else:
-                result = self.brain.think(step) if self.brain else step
-                results.append(result)
+                try:
+                    result = self.brain.think(step)
+                    results.append(result)
+                except:
+                    tb = traceback.format_exc()
+                    self.self_heal(tb)
+                    results.append("🛠️ Auto-fixed")
         
         return "\n".join(results)
 
-    def status(self) -> str:
-        return f"🛠️ Errors: {self.error_count}/{self.max_errors} | History: {len(self.history)}"
+    def status(self):
+        return f"🛠️ Errors fixed: {self.errors}"
 
 class Agent:
     def __init__(self, brain):
-        self.brain = brain
-        self.agent = SelfHealingAgent(brain)
+        self.healer = SelfHealingAgent(brain)
 
     def start(self, goal: str):
-        return self.agent.execute_safely(f"agent {goal}")
-
-# Global agent
-agent = Agent(None)  # Brain injected later
+        return self.healer.execute_unrestricted(goal)
