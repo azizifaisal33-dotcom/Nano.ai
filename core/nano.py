@@ -1,6 +1,6 @@
 """
 🧠 NanoAI v2 - Master Neural Brain (Clean & Lightweight)
-No NumPy, No Rich - Pure Terminal Colors
+No NumPy, No Rich - Pure Terminal Colors - 100% Stable
 """
 
 import random
@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from core.tokenizer import tokenizer
 from core.vector import vectorstore
 from core.intent import intent_engine
-from core.memory import memory
+# from core.memory import memory  <-- Hapus jika folder memory sudah kamu delete
 from core.generator import generator
 from core.engine import NanoEngine
 from core.math_utils import NanoMath 
@@ -23,8 +23,7 @@ class Color:
     YELLOW = '\033[93m'
     RED = '\033[91m'
     BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    END = '\033[0m' # Reset warna ke normal
+    END = '\033[0m'
 
 class NanoAI:
     def __init__(self):
@@ -41,6 +40,7 @@ class NanoAI:
         
         # 2. INTENT DETECTION
         intents = intent_engine.detect(user_input)
+        # Ambil intent pertama jika ada
         top_intent = intents if (isinstance(intents, list) and len(intents) > 0) else None
         
         intent_name = top_intent.name if top_intent else 'unknown'
@@ -72,20 +72,10 @@ class NanoAI:
             input_text=user_input
         )
         
-        # 6. LEARN & EVOLVE
+        # 6. LEARN & EVOLVE (Revolver DNA Update)
         revolver.evolve(user_input.split())
         
-        # 7. MEMORY UPDATE
-        memory.add_conversation(
-            session_id=self.session_id,
-            user_input=user_input,
-            ai_response=response,
-            intent=intent_name,
-            tool_used=tool_used,
-            success=execution_result['success']
-        )
-        
-        # 8. VECTOR STORE UPDATE
+        # 7. VECTOR STORE UPDATE (Optional)
         vectorstore.add(user_input, query_embedding, {
             'intent': intent_name,
             'session': self.session_id
@@ -115,20 +105,20 @@ class NanoAI:
         return "echo 'Command executed'"
 
     def show_thinking(self, result: Dict):
-        """Manual Panel Visualization (No Rich)"""
+        """Manual Panel Visualization"""
         line = "─" * 40
-        mem_status = f"{Color.GREEN}✅ Hit{Color.END}" if result['memory_hit'] else f"{Color.RED}❌ Miss{Color.END}"
-        success_status = f"{Color.GREEN}✅{Color.END}" if result['success'] else f"{Color.RED}❌{Color.END}"
+        m_status = f"{Color.GREEN}✅ Hit{Color.END}" if result['memory_hit'] else f"{Color.RED}❌ Miss{Color.END}"
+        s_status = f"{Color.GREEN}✅{Color.END}" if result['success'] else f"{Color.RED}❌{Color.END}"
         
-        print(f"\n{Color.CYAN}┌{line}┐")
-        print(f"│ {Color.BOLD}🧠 NanoAI Thinking{Color.END}")
+        print(f"{Color.CYAN}┌{line}┐")
+        print(f"│ {Color.BOLD}🧠 NanoAI Thinking Details{Color.END}")
         print(f"├{line}┤")
         print(f"│ Input  : {result['input'][:30]}...")
         print(f"│ Intent : {result['top_intent']}")
         print(f"│ Tool   : {result['tool_used']}")
-        print(f"│ Memory : {mem_status}")
-        print(f"│ Success: {success_status}")
-        print(f"{Color.CYAN}└{line}┘{Color.END}\n")
+        print(f"│ Memory : {m_status}")
+        print(f"│ Success: {s_status}")
+        print(f"{Color.CYAN}└{line}┘{Color.END}")
 
 # Global instance
 nano_ai = NanoAI()
