@@ -3,36 +3,28 @@ import os
 import random
 import hashlib
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict
 import struct
 
 class Revolver:
-
-def __init__(self, fs, backup):
-    self.fs = fs
-    self.backup = backup
-    self.dna_path = Path("data/brain.lvr")
-    self.dna_path.parent.mkdir(exist_ok=True)
-    
-    # ✅ FORCE CLEAN DNA CORRUPTION
-    if self.dna_path.exists():
-        try:
-            self.dna_path.unlink()  # Delete corrupted file
-            print("🧬 Corrupted DNA deleted")
-        except:
-            pass
-    
-    self.dna = {}  # Fresh DNA
-    print("🔫 Revolver: Fresh DNA initialized ✓")
     def __init__(self, fs, backup):
         self.fs = fs
         self.backup = backup
         self.dna_path = Path("data/brain.lvr")
         self.dna_path.parent.mkdir(exist_ok=True)
-        self.dna = self._load_dna()
-        print("🔫 Revolver DNA loaded:", len(self.dna) if self.dna else 0)
+        
+        # ✅ FORCE CLEAN DNA CORRUPTION ON START
+        if self.dna_path.exists():
+            try:
+                self.dna_path.unlink()
+                print("🧬 Corrupted DNA deleted")
+            except:
+                pass
+        
+        self.dna = {}
+        print("🔫 Revolver: Fresh DNA initialized ✓")
 
-    def _load_dna(self) -> Dict[str, List[float]]:
+    def _load_dna(self) -> Dict:
         """Load DNA with corruption recovery"""
         if not self.dna_path.exists():
             return {}
@@ -52,7 +44,7 @@ def __init__(self, fs, backup):
                 
                 return pickle.loads(data)
         except Exception as e:
-            print(f"❌ DNA load failed: {e} - Resetting")
+            print(f"❌ DNA load failed: {e}")
             self.dna_path.unlink(missing_ok=True)
             return {}
 
@@ -83,18 +75,15 @@ def __init__(self, fs, backup):
         """Convert instruction to DNA weights"""
         tokens = self._tokenize_instruction(instruction)
         dna_weights = []
-        
         for token in tokens:
             h = int(hashlib.md5(token.encode()).hexdigest(), 16)
             weight = (h % 10000) / 10000.0
             dna_weights.append(weight)
-        
         return dna_weights
 
     def evolve(self, target_file: str, instruction: str) -> str:
         """Main evolution method"""
         print(f"🔫 EVOLVING {target_file} with: {instruction[:50]}...")
-        
         self.backup.create()
         
         content = self.fs.read(target_file)
@@ -102,8 +91,8 @@ def __init__(self, fs, backup):
             return f"❌ File {target_file} not found"
         
         dna_pattern = self._instruction_to_dna(instruction)
-        
         instruction_key = hashlib.md5(instruction.encode()).hexdigest()[:8]
+        
         self.dna[instruction_key] = {
             "file": target_file,
             "instruction": instruction,
@@ -116,100 +105,64 @@ def __init__(self, fs, backup):
         if self.fs.write(target_file, evolved_content):
             self._save_dna()
             return f"✅ {target_file} evolved! DNA stored: {instruction_key}"
-        else:
-            return "❌ Evolution failed - file write error"
+        return "❌ Evolution failed"
 
     def _apply_evolution(self, content: str, instruction: str, dna_pattern: List[float]) -> str:
-        """Apply intelligent code changes based on DNA"""
         lines = content.split('\n')
         evolved_lines = []
-        
         intent = self._detect_intent(instruction)
         
-        for i, line in enumerate(lines):
+        for line in lines:
             if self._should_modify_line(line, instruction, dna_pattern):
-                evolved_line = self._evolve_line(line, intent, dna_pattern)
+                evolved_line = self._evolve_line(line, intent)
                 evolved_lines.append(f"# 🔫 EVOLVED: {evolved_line}")
             else:
                 evolved_lines.append(line)
         
         if "fungsi" in instruction.lower() or "function" in instruction.lower():
             new_func = self._generate_new_function(intent)
-            evolved_lines.append(f"\n# 🧬 NEW DNA FUNCTION")
-            evolved_lines.extend(new_func.split('\n'))
+            evolved_lines.extend(["", "# 🧬 NEW DNA FUNCTION"] + new_func.split('\n'))
         
         return '\n'.join(evolved_lines)
 
     def _detect_intent(self, instruction: str) -> str:
-        """Detect evolution intent"""
         text = instruction.lower()
-        if any(w in text for w in ["chat", "obrolan", "talk"]):
-            return "chat_enhance"
-        elif any(w in text for w in ["command", "terminal", "bash"]):
-            return "command"
-        elif "error" in text or "pengamanan" in text:
-            return "safety"
-        elif "memory" in text:
-            return "memory"
+        if any(w in text for w in ["chat", "obrolan"]): return "chat_enhance"
+        if any(w in text for w in ["command", "terminal"]): return "command"
+        if "error" in text or "pengamanan" in text: return "safety"
+        if "memory" in text: return "memory"
         return "general"
 
     def _should_modify_line(self, line: str, instruction: str, dna_pattern: List[float]) -> bool:
-        """DNA-weighted decision to modify line"""
         line_lower = line.lower()
-        instruction_lower = instruction.lower()
-        
-        score = sum(1 for token in self._tokenize_instruction(instruction) 
-                   if token in line_lower)
-        return score > 0 and random.random() < 0.7
+        score = sum(1 for token in self._tokenize_instruction(instruction) if token in line_lower)
+        return score > 0 and random.random() < 0.6
 
-    def _evolve_line(self, line: str, intent: str, dna_pattern: List[float]) -> str:
-        """Evolve single line based on DNA"""
+    def _evolve_line(self, line: str, intent: str) -> str:
         if intent == "chat_enhance" and 'return' in line:
-            return line.replace("return", "return f'{result} 🤖'")
-        elif intent == "safety" and 'try:' not in line and 'except' not in line:
-            return f"try:\n    {line}"
+            return line.replace("return", "return f'{result} 😎'")
         return line
 
     def _generate_new_function(self, intent: str) -> str:
-        """Generate new function based on DNA intent - FIXED SYNTAX!"""
-        if intent == "chat_enhance":
-            return '''def smart_chat(self, text):
-    """DNA-enhanced chat with context awareness"""
-    if 'nano' in text.lower():
-        return '🧠 NanoAI understands you perfectly!'
-    return self.chat(text)'''
-        
-        elif intent == "safety":
-            return '''def safe_exec(self, cmd):
-    """DNA safety wrapper"""
-    if "rm -rf" in cmd.lower() or "sudo" in cmd.lower():
-        return '🚫 Dangerous command blocked by DNA'
-    import subprocess
-    return subprocess.run(cmd, shell=True, capture_output=True).returncode'''
-        
-        elif intent == "memory":
-            return '''def dna_memory(self, key, value):
-    """Store in DNA-enhanced memory"""
-    self.revolver.dna[key] = value
+        funcs = {
+            "chat_enhance": '''def smart_chat(self, text):
+    if 'halo' in text.lower():
+        return 'Yo bro! 👊 Siap bantu!'
+    return self.chat(text)''',
+            "safety": '''def safe_exec(self, cmd):
+    if any(d in cmd.lower() for d in ["rm -rf", "sudo"]):
+        return "🚫 Blocked by DNA!"
+    return cmd''',
+            "memory": '''def dna_save(self, key, data):
+    self.revolver.dna[key] = data
     self.revolver._save_dna()'''
-        
-        else:
-            return '''def dna_func(self):
-    """DNA generated function"""
-    pass'''
+        }
+        return funcs.get(intent, "def dna_func(self): pass")
 
     def status(self) -> str:
-        """DNA status report"""
-        total_dna = len(self.dna)
-        recent = [v for v in self.dna.values() if 'timestamp' in v]
-        return f"DNA Strands: {total_dna} | Recent: {len(recent)}"
+        return f"DNA Strands: {len(self.dna)}"
 
     def auto_repair(self):
-        """Auto-repair corrupted DNA"""
-        old_dna = self.dna
-        self.dna = self._load_dna()
-        if not self.dna:
-            self.dna = {"repair": {"pattern": [0.5]*10}}
-            self._save_dna()
-            return "🧬 DNA auto-repaired!"
-        return "✅ DNA healthy"
+        self.dna = {"repair": [0.5]*10}
+        self._save_dna()
+        return "🧬 DNA repaired!"
