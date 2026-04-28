@@ -1,11 +1,4 @@
-import os
-import sys
 import uuid
-
-# =========================
-# PATH FIX
-# =========================
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.command_ai import CommandAI
 from core.agent import Agent
@@ -15,147 +8,113 @@ from core.memory import memory
 
 
 # =========================
-# SAFE FILE SYSTEM
-# =========================
-class FileSystem:
-    def read(self, path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-
-    def write(self, path, content):
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
-
-
-# =========================
-# BACKUP SYSTEM
-# =========================
-class Backup:
-    def create(self):
-        try:
-            os.system("cp core/brain.py core/brain_backup.py")
-        except:
-            pass
-
-
-# =========================
-# SAFETY FILTER
+# SAFE COMMAND
 # =========================
 def safe_command(cmd):
-    blacklist = [
-        "rm -rf",
-        "shutdown",
-        "reboot",
-        "git pull",
-        "git push",
-        "sudo",
-        "mkfs",
-        "dd if="
-    ]
-
-    for b in blacklist:
-        if b in cmd:
-            return None
-
-    return cmd
+    blacklist = ["rm -rf", "shutdown", "reboot", "sudo", "mkfs", "dd if="]
+    return None if any(b in cmd for b in blacklist) else cmd
 
 
 # =========================
-# MAIN BRAIN (CORE AI OS)
+# BRAIN CORE
 # =========================
 class Brain:
     def __init__(self):
         self.cmd_ai = CommandAI()
         self.agent = Agent(self)
-        self.revolver = Revolver(FileSystem(), Backup())
-
+        self.revolver = Revolver()
         self.session_id = str(uuid.uuid4())[:10]
 
         print("🧠 Nano AI BRAIN ONLINE")
 
+    # =========================
+    # INTENT DETECTOR
+    # =========================
+    def detect_intent(self, text):
+        t = text.lower()
+
+        if t.startswith("agent"):
+            return "agent"
+        if t.startswith("evolve"):
+            return "evolve"
+
+        chat_words = ["halo", "hai", "siapa", "nama", "apa", "kenapa", "how", "what"]
+        if any(w in t for w in chat_words):
+            return "chat"
+
+        return "command"
+
+    # =========================
+    # CHAT RESPONSE
+    # =========================
+    def chat(self, text):
+        t = text.lower()
+
+        if "halo" in t or "hai" in t:
+            return "Halo 👋 aku NanoAI"
+        if "siapa kamu" in t:
+            return "Aku NanoAI system kamu"
+        if "nama" in t:
+            return "Namaku NanoAI"
+
+        return "Aku belum paham, tapi aku belajar 🤖"
 
     # =========================
     # MEMORY WRAPPER
     # =========================
-    def remember(self, user_input, ai_output, intent="chat", success=True):
-        memory.add(
-            self.session_id,
-            user_input,
-            ai_output,
-            intent=intent,
-            tool_used="brain",
-            success=success
-        )
-
+    def remember(self, user, ai, intent):
+        memory.add(self.session_id, user, ai, intent=intent)
 
     # =========================
-    # AGENT MODE
+    # AGENT
     # =========================
     def handle_agent(self, text):
         if text.startswith("agent"):
-            if "start" in text:
-                goal = text.replace("agent start", "").strip()
-                return self.agent.start(goal)
-
-            if "stop" in text:
-                return self.agent.stop()
-
-            if "log" in text:
-                return self.agent.log()
-
+            return self.agent.start(text)
         return None
 
-
     # =========================
-    # EVOLVE MODE (REVOLVER)
+    # EVOLVE
     # =========================
     def handle_evolve(self, text):
         if text.startswith("evolve"):
             parts = text.split(" ", 2)
-
             if len(parts) < 3:
                 return "format: evolve <file> <instruction>"
-
             return self.revolver.evolve(parts[1], parts[2])
-
         return None
 
-
     # =========================
-    # PLUGIN / COMMAND THINK ENGINE
+    # MAIN THINK ENGINE
     # =========================
     def think(self, text):
-        text = text.strip().lower()
+        intent = self.detect_intent(text)
 
-        # log input
-        self.remember(text, "input_received", intent="input")
+        # CHAT
+        if intent == "chat":
+            res = self.chat(text)
+            self.remember(text, res, "chat")
+            return res
 
-        # -------------------------
-        # AGENT MODE
-        # -------------------------
+        # AGENT
         res = self.handle_agent(text)
         if res:
-            self.remember(text, str(res), intent="agent", success=True)
+            self.remember(text, str(res), "agent")
             return res
 
-        # -------------------------
-        # EVOLVE MODE
-        # -------------------------
+        # EVOLVE
         res = self.handle_evolve(text)
         if res:
-            self.remember(text, str(res), intent="evolve", success=True)
+            self.remember(text, str(res), "evolve")
             return res
 
-        # -------------------------
-        # COMMAND AI GENERATION
-        # -------------------------
+        # COMMAND AI
         cmds = self.cmd_ai.generate(text)
 
         last_error = ""
 
         for c in cmds:
             c = safe_command(c)
-
             if not c:
                 continue
 
@@ -163,43 +122,15 @@ class Brain:
                 result = engine.run(c)
 
                 if result.get("success"):
-                    output = f"⚙️ {c}\n{result['output']}"
-                    self.remember(text, output, intent="execute", success=True)
-                    return output
+                    out = f"⚙️ {c}\n{result['output']}"
+                    self.remember(text, out, "command")
+                    return out
 
                 last_error = result.get("output")
 
             except Exception as e:
                 last_error = str(e)
 
-        # fallback
-        fallback = f"❌ gagal\n{last_error if last_error else 'no output'}"
-
-        self.remember(text, fallback, intent="error", success=False)
-        return fallback
-
-
-# =========================
-# RUNNER
-# =========================
-if __name__ == "__main__":
-    brain = Brain()
-
-    print("\n💬 Nano AI ACTIVE\n")
-
-    while True:
-        try:
-            user = input("you> ")
-
-            if user in ["exit", "quit"]:
-                print("bye")
-                break
-
-            print("\n🧠 AI:\n", brain.think(user), "\n")
-
-        except KeyboardInterrupt:
-            print("\nbye")
-            break
-
-        except Exception as e:
-            print("⚠️ error:", e)
+        fail = f"❌ gagal\n{last_error if last_error else 'no output'}"
+        self.remember(text, fail, "error")
+        return fail
