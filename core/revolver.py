@@ -1,270 +1,168 @@
-
 #!/usr/bin/env python3
 import os
 import pickle
-import struct
 import hashlib
 import time
 import random
 import math
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass, asdict
+from collections import defaultdict
 
 @dataclass
-class Shard:
+class CognitiveShard:
     intent: str
-    weights: List[float]
-    biases: List[float]
+    weights: List[float]  # Neural weights
+    biases: List[float]   # Neural biases
+    tone: Dict[str, float]  # Emotional tone {happy:0.8, serious:0.3}
+    context_patterns: List[str]  # Conversation patterns
     activation_count: int = 0
     success_count: int = 0
-    last_updated: float = 0.0
-    version: str = "2.5"
+    mutation_count: int = 0
+    last_mutated: float = 0.0
 
-class NeuralSharding:
+class CognitiveRevolver:
     def __init__(self):
-        self.shard_dir = Path("data/shards")
+        self.shard_dir = Path("data/cognitive")
         self.shard_dir.mkdir(parents=True, exist_ok=True)
-        self.header_file = Path("data/brain.lvr")
-        self.backup_file = Path("data/brain_backup.lvr")
-        self.shards: Dict[str, Shard] = {}
-        self.global_weights = [0.5] * 32  # 32 neurons
-        self.global_biases = [0.0] * 32
-        self.learning_rate = 0.02
-        self._init_header()
-        self.load_all_shards()
-
-    def _init_header(self):
-        """Auto-repair corrupt header"""
-        try:
-            if self.header_file.exists():
-                with open(self.header_file, "rb") as f:
-                    header = f.read(8)
-                    if len(header) != 8 or header[:4] != b"NANO":
-                        raise ValueError("Corrupt header")
-            else:
-                # Create fresh header
-                header_data = {
-                    "version": "2.5",
-                    "global_weights": self.global_weights,
-                    "global_biases": self.global_biases,
-                    "shard_count": 0,
-                    "timestamp": time.time()
-                }
-                with open(self.header_file, "wb") as f:
-                    pickle.dump(header_data, f)
-                self._backup()
-                print("🧬 brain.lvr header initialized")
-        except:
-            self._recover_from_backup()
-
-    def _recover_from_backup(self):
-        """Auto-restore from backup"""
-        try:
-            if self.backup_file.exists():
-                self.header_file.write_bytes(self.backup_file.read_bytes())
-                print("🧬 Recovered from backup")
-            else:
-                self._init_header()
-        except:
-            self._init_header()
-
-    def _backup(self):
-        """Atomic backup"""
-        try:
-            self.header_file.replace(self.backup_file)
-        except:
-            pass
+        self.dna_file = Path("data/brain.lvr")
+        self.dna_file.parent.mkdir(parents=True, exist_ok=True)
+        self.shards: Dict[str, CognitiveShard] = {}
+        self.global_tone = {"happy": 0.6, "helpful": 0.8, "curious": 0.4}
+        self.mutation_rate = 0.05  # 5% chance per interaction
+        self._load_dna()
 
     def sigmoid(self, x: float) -> float:
-        if x > 10: return 1.0
-        if x < -10: return 0.0
-        return 1 / (1 + math.exp(-x))
+        return 1 / (1 + math.exp(-math.tanh(x / 2)))
 
-    def sigmoid_deriv(self, x: float) -> float:
-        s = self.sigmoid(x)
-        return s * (1 - s)
+    def intent_signature(self, text: str) -> str:
+        """Hash + context fingerprint"""
+        words = text.lower().split()[:8]
+        sig = hashlib.md5(' '.join(words).encode()).hexdigest()[:10]
+        return sig
 
-    def intent_hash(self, intent: str) -> str:
-        return hashlib.md5(intent.lower().encode()).hexdigest()[:8]
-
-    def get_shard_path(self, shard_id: str) -> Path:
-        return self.shard_dir / f"{shard_id}.lvr"
-
-    def create_shard(self, intent: str) -> str:
-        shard_id = self.intent_hash(intent)
-        shard_path = self.get_shard_path(shard_id)
+    def create_shard(self, intent: str, context: str = "") -> str:
+        shard_id = self.intent_signature(intent)
+        shard_path = self.shard_dir / f"{shard_id}.lvr"
         
         if not shard_path.exists():
-            shard = Shard(
+            shard = CognitiveShard(
                 intent=intent,
-                weights=[random.uniform(-1, 1) for _ in range(32)],
-                biases=[random.uniform(-0.5, 0.5) for _ in range(32)]
+                weights=[random.uniform(-1, 1) for _ in range(24)],
+                biases=[random.uniform(-0.3, 0.3) for _ in range(24)],
+                tone={
+                    "happy": random.uniform(0.3, 0.9),
+                    "helpful": random.uniform(0.6, 1.0),
+                    "curious": random.uniform(0.2, 0.7),
+                    "serious": random.uniform(0.1, 0.5)
+                },
+                context_patterns=[context[:50]]
             )
-            try:
-                with open(shard_path, "wb") as f:
-                    pickle.dump(asdict(shard), f)
-                self.shards[shard_id] = shard
-                self._update_header(shard_id)
-                print(f"🧬 Shard created: {shard_id}")
-            except:
-                pass
+            with open(shard_path, "wb") as f:
+                pickle.dump(asdict(shard), f)
+            self.shards[shard_id] = shard
+            self._save_dna()
         return shard_id
 
-    def load_all_shards(self):
-        """Load all shards"""
+    def _load_dna(self):
+        """Load all cognitive shards"""
         self.shards.clear()
         try:
             for shard_file in self.shard_dir.glob("*.lvr"):
-                try:
-                    with open(shard_file, "rb") as f:
-                        data = pickle.load(f)
-                        shard = Shard(**data)
-                        self.shards[shard.intent_hash(shard.intent)] = shard
-                except:
-                    shard_file.unlink()  # Delete corrupt shard
+                with open(shard_file, "rb") as f:
+                    data = pickle.load(f)
+                    shard = CognitiveShard(**data)
+                    self.shards[data['intent_signature'](data['intent'])] = shard
         except:
             pass
 
-    def _update_header(self, shard_id: str = None):
-        """Update header shard count"""
+    def _save_dna(self):
+        """Save DNA header"""
         try:
-            header_data = {
+            dna_data = {
                 "version": "2.5",
-                "global_weights": self.global_weights,
-                "global_biases": self.global_biases,
                 "shard_count": len(self.shards),
-                "timestamp": time.time()
+                "global_tone": self.global_tone,
+                "mutation_history": time.time()
             }
-            with open(self.header_file, "wb") as f:
-                pickle.dump(header_data, f)
-            self._backup()
+            with open(self.dna_file, "wb") as f:
+                pickle.dump(dna_data, f)
         except:
             pass
 
-    def forward(self, shard_id: str, inputs: List[float]) -> List[float]:
-        """Neural forward pass"""
+    def forward_emotion(self, shard_id: str, inputs: List[float]) -> Dict[str, float]:
+        """Cognitive forward pass with emotion"""
         if shard_id not in self.shards:
-            return [0.5] * 32
-            
-        shard = self.shards[shard_id]
-        outputs = []
+            return self.global_tone.copy()
         
-        for i in range(32):
-            inp = inputs[i] if i < len(inputs) else 0.0
-            z = inp * shard.weights[i] + shard.biases[i]
-            outputs.append(self.sigmoid(z))
+        shard = self.shards[shard_id]
+        emotions = {}
+        
+        for emotion in shard.tone:
+            emotion_idx = list(shard.tone.keys()).index(emotion)
+            if emotion_idx < len(inputs):
+                z = inputs[emotion_idx] * shard.weights[emotion_idx] + shard.biases[emotion_idx]
+                emotions[emotion] = self.sigmoid(z)
         
         shard.activation_count += 1
-        return outputs
+        return emotions
 
-    def mini_backprop(self, shard_id: str, inputs: List[float], target: float, feedback: bool):
-        """Pure Python backpropagation"""
+    def auto_mutate(self, shard_id: str, feedback: float):
+        """Periodic DNA mutation based on patterns"""
+        if random.random() > self.mutation_rate:
+            return False
+        
         if shard_id not in self.shards:
-            return
-            
+            return False
+        
         shard = self.shards[shard_id]
-        prediction = max(self.forward(shard_id, inputs))
-        error = target - prediction
-        delta = error * self.sigmoid_deriv(prediction)
+        shard.mutation_count += 1
+        shard.last_mutated = time.time()
         
-        # Update weights & biases
-        for i in range(32):
-            inp = inputs[i] if i < len(inputs) else 0.0
-            shard.weights[i] += self.learning_rate * delta * inp
-            shard.biases[i] += self.learning_rate * delta
+        # Mutate weights slightly
+        for i in range(len(shard.weights)):
+            shard.weights[i] += random.uniform(-0.1, 0.1) * feedback
+            shard.weights[i] = max(-2.0, min(2.0, shard.weights[i]))
         
-        # Update success metrics
-        if feedback:
-            shard.success_count += 1
-        shard.last_updated = time.time()
+        # Evolve tone based on success
+        for emotion in shard.tone:
+            shard.tone[emotion] += (feedback - 0.5) * 0.1
+            shard.tone[emotion] = max(0.0, min(1.0, shard.tone[emotion]))
         
-        # Save shard
-        shard_path = self.get_shard_path(shard_id)
+        # Save mutated shard
+        shard_path = self.shard_dir / f"{shard_id}.lvr"
+        with open(shard_path, "wb") as f:
+            pickle.dump(asdict(shard), f)
+        
+        self._save_dna()
+        return True
+
+    def evolve_code(self, target_file: str, instruction: str) -> str:
+        """Evolve target file with cognitive context"""
+        shard_id = self.create_shard(instruction)
+        context_inputs = [ord(c) / 255.0 for c in instruction[:24]]
+        emotions = self.forward_emotion(shard_id, context_inputs)
+        
+        content = open(target_file, "r").read() if os.path.exists(target_file) else ""
+        evolved = content + f"\n# Cognitive Shard {shard_id}: {emotions}\n"
+        
         try:
-            with open(shard_path, "wb") as f:
-                pickle.dump(asdict(shard), f)
+            open(target_file, "w").write(evolved)
+            self.auto_mutate(shard_id, 0.8)  # Positive evolution feedback
+            return f"🧬 EVOLVED {target_file} | Tone: {emotions}"
         except:
-            pass
-
-    def analyze(self, intent: str) -> Dict[str, Any]:
-        """Get neural recommendation"""
-        shard_id = self.create_shard(intent)
-        inputs = [ord(c) % 256 / 255.0 for c in intent[:32]]
-        outputs = self.forward(shard_id, inputs)
-        
-        confidence = max(outputs)
-        action = "EVOLVE" if confidence > 0.8 else "ADAPT" if confidence > 0.5 else "STABLE"
-        
-        shard = self.shards.get(shard_id, Shard(intent="", weights=[], biases=[]))
-        success_rate = shard.success_count / max(1, shard.activation_count)
-        
-        return {
-            "shard_id": shard_id,
-            "confidence": confidence,
-            "action": action,
-            "success_rate": success_rate,
-            "recommendation": f"{action} weights for '{intent}'"
-        }
-
-class Revolver:
-    def __init__(self, fs, backup):
-        self.fs = fs
-        self.backup = backup
-        self.neural = NeuralSharding()
+            return f"❌ Evolution failed: {target_file}"
 
     def status(self) -> str:
-        total_shards = len(self.neural.shards)
-        avg_success = sum(s.success_count / max(1, s.activation_count) 
-                         for s in self.neural.shards.values())
-        avg_success = avg_success / max(1, total_shards)
-        return f"{total_shards} shards | {avg_success:.1%} success | LR:{self.neural.learning_rate:.3f}"
-
-    def evolve(self, target_file: str, instruction: str) -> str:
-        try:
-            # Neural analysis
-            analysis = self.neural.analyze(instruction)
-            print(f"🧠 [{analysis['shard_id']}] {analysis['confidence']:.2f} {analysis['action']}")
-            
-            # Read target
-            content = self.fs.read(target_file)
-            if not content:
-                return f"❌ {target_file} not found"
-            
-            # Generate evolution
-            new_content = self._evolve_content(content, instruction, analysis)
-            
-            # Apply with backup
-            if self.backup.create() and self.fs.write(target_file, new_content):
-                # Positive feedback
-                inputs = [ord(c) % 256 / 255.0 for c in instruction[:32]]
-                self.neural.mini_backprop(analysis['shard_id'], inputs, 1.0, True)
-                return f"✅ EVOLVED {target_file} | {analysis['shard_id']}"
-            else:
-                inputs = [ord(c) % 256 / 255.0 for c in instruction[:32]]
-                self.neural.mini_backprop(analysis['shard_id'], inputs, 0.0, False)
-                return "❌ Evolution failed - DNA protected"
-        except Exception as e:
-            return f"💥 {e}"
-
-    def _evolve_content(self, content: str, instruction: str, analysis: Dict) -> str:
-        """Intelligent code transformation"""
-        lines = content.splitlines()
-        evolved = []
+        if not self.shards:
+            return "0 shards | DNA virgin"
         
-        for line in lines:
-            if 'def think' in line or 'def evolve' in line:
-                evolved.append(f"        # Neural {analysis['shard_id']}: {analysis['action']}")
-            evolved.append(line)
+        total_act = sum(s.activation_count for s in self.shards.values())
+        total_success = sum(s.success_count for s in self.shards.values())
+        mutations = sum(s.mutation_count for s in self.shards.values())
         
-        # Add neural footer
-        footer = f"""
-# Neural Shard: {analysis['shard_id']} | Success: {analysis['success_rate']:.1%}
-# Auto-evolved: {time.ctime()}
-"""
-        return '\n'.join(evolved) + footer
+        return f"{len(self.shards)} shards | {total_success/total_act:.0%} success | {mutations} mutations"
 
-    def feedback(self, shard_id: str, success: bool):
-        """Agent feedback loop"""
-        inputs = [random.random() for _ in range(32)]
-        self.neural.mini_backprop(shard_id, inputs, 1.0 if success else 0.0, success)
+# Global instance
+revolver = CognitiveRevolver()
