@@ -1,55 +1,57 @@
 import subprocess
 import os
 import sys
-from config import config
 
 class NanoUpdater:
     def __init__(self):
-        self.repo_path = os.getcwd()  # Mengambil lokasi folder Nano.ai
-        self.owner = config.OWNER
+        self.repo_path = os.getcwd()
 
     def run_command(self, command):
-        """Menjalankan perintah bash dan mengambil outputnya"""
+        """Menjalankan perintah bash dengan aman"""
         try:
             result = subprocess.run(
-                command, shell=True, check=True, 
-                capture_output=True, text=True
+                command, shell=True, capture_output=True, text=True, check=True
             )
             return result.stdout.strip()
-        except subprocess.CalledProcessError as e:
-            return f"Error: {e.stderr}"
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     def check_for_updates(self):
-        """Cek apakah ada perubahan di GitHub"""
-        print(f"[*] Menghubungkan ke GitHub untuk proyek {self.owner}...")
+        """Cek update ke GitHub tanpa memutus program"""
+        print("[*] Mengecek pembaruan sistem...")
+        # Pastikan ini adalah folder git
+        if not os.path.exists(".git"):
+            return False
+            
         self.run_command("git fetch")
-        local_hash = self.run_command("git rev-parse HEAD")
-        remote_hash = self.run_command("git rev-parse @{u}")
-
-        if local_hash != remote_hash:
-            return True
-        return False
+        local = self.run_command("git rev-parse HEAD")
+        remote = self.run_command("git rev-parse @{u}")
+        
+        return local != remote
 
     def evolve_system(self):
-        """Proses download kode baru dan instalasi library"""
-        if self.check_for_updates():
-            print("[!] Versi baru ditemukan! Memulai proses evolusi...")
-            
-            # 1. Pull kode terbaru
-            pull_status = self.run_command("git pull origin main")
-            print(f"[+] Git Pull: {pull_status}")
-
-            # 2. Update library (requirements.txt)
-            if os.path.exists("requirements.txt"):
-                print("[*] Mengupdate library yang diperlukan...")
-                self.run_command("pip install -r requirements.txt")
-
-            print("[√] Evolusi selesai. NanoAI perlu restart.")
-            return True
-        else:
-            print("[√] NanoAI sudah dalam versi terbaru.")
+        """Proses pembaruan otomatis (Evolve)"""
+        try:
+            if self.check_for_updates():
+                print("[!] Versi baru ditemukan. Memulai evolusi kode...")
+                self.run_command("git pull origin main")
+                
+                if os.path.exists("requirements.txt"):
+                    self.run_command("pip install -r requirements.txt")
+                
+                print("[√] Evolusi sukses.")
+                return True
+            else:
+                print("[√] Sistem sudah dalam versi terbaru.")
+                return False
+        except:
+            print("[!] Gagal melakukan update. Cek koneksi internet.")
             return False
 
     def restart_nano(self):
-        """Mematikan proses sekarang dan memulai ulang main.py"""
-        print("[*] Sedang merestart
+        """Restart otomatis untuk menerapkan perubahan"""
+        print("[*] Memulai ulang sistem untuk menerapkan update...")
+        os.execv(sys.executable, ['python'] + sys.argv)
+
+# Inisialisasi sederhana
+updater = NanoUpdater()
