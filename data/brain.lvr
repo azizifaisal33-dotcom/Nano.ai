@@ -27,12 +27,24 @@ class RevolverIO:
             return weights, version
 
 class Revolver:
-    def __init__(self, dna_path="data/brain.lvr", size=128):
-        self.dna_path = dna_path
-        self.size = size
-        dna_data = RevolverIO.load_lvr(self.dna_path)
-        self.weights = dna_data if dna_data else [0.01] * self.size
-
+    # Ganti __init__ NeuralSharding:
+def __init__(self):
+    self.shards_path = Path("data/brain.lvr")
+    self.shards_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # ✅ FORCE CREATE empty brain.lvr jika kosong
+    if not self.shards_path.exists():
+        with open(self.shards_path, "wb") as f:
+            pickle.dump({"shards": {}, "global_weights": [0.5]*16}, f)
+        print("🧬 brain.lvr CREATED")
+    
+    self.backup_path = Path("data/brain_backup.lvr")
+    self.backup_path.parent.mkdir(parents=True, exist_ok=True)
+    self.shards: Dict[str, Shard] = {}
+    self.global_weights = [0.5] * 16
+    self.global_biases = [0.0] * 16
+    self.learning_rate = 0.01
+    self.load_shards()
     def save_dna(self):
         RevolverIO.save_lvr(self.dna_path, self.weights)
 
