@@ -1,39 +1,31 @@
-from config import config
-from core.engine import engine
-from memory import memory
 
-def main():
-    print(f"--- {config.AGENT_NAME} v{config.VERSION} ---")
-    print(f"Welcome back, {config.OWNER_NAME}!\n")
+import sys
+import os
+from core.updater import NanoUpdater
+from core.nano import NanoAI
 
-    while True:
-        try:
-            user_input = input(f"{config.OWNER_NAME.lower()}> ")
+def boot_system():
+    print("--- Nano.ai System Booting ---")
+    
+    # 1. Cek Pembaruan (Evolusi Kode)
+    updater = NanoUpdater()
+    try:
+        if updater.evolve_system():
+            # Jika ada update, restart otomatis
+            updater.restart_nano()
+    except Exception as e:
+        print(f"[!] Gagal mengecek update: {e}")
 
-            if user_input.lower() in ["exit", "quit", "keluar"]:
-                print(f"Sampai jumpa, {config.OWNER_NAME}!")
-                break
-
-            if not user_input.strip():
-                continue
-
-            response = engine.generate(user_input)
-
-            # Simpan ke SQLite
-            memory.add(
-                session_id="local_dev",
-                user_input=user_input,
-                ai_response=response
-            )
-
-            print(f"\n🧠 {config.AGENT_NAME}:")
-            print(f"{response}\n")
-
-        except KeyboardInterrupt:
-            print(f"\nSistem dimatikan. Sampai jumpa, {config.OWNER_NAME}!")
-            break
-        except Exception as e:
-            print(f"\n[!] Terjadi kesalahan: {e}")
+    # 2. Inisialisasi Otak AI
+    print("[*] Memuat memori dan sistem...")
+    bot = NanoAI()
+    
+    # 3. Jalankan Antarmuka (CLI)
+    bot.start_shell()
 
 if __name__ == "__main__":
-    main()
+    try:
+        boot_system()
+    except KeyboardInterrupt:
+        print("\n[!] NanoAI dinonaktifkan. Sampai jumpa, Yeshie.")
+        sys.exit(0)
