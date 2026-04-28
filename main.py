@@ -17,4 +17,7 @@ if __name__ == "__main__":
 
         except KeyboardInterrupt:
             print("\nbye")
-            break e)
+            break
+
+        except Exception as e:
+            print("⚠️ error:", e)
