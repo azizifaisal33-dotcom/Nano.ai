@@ -1,15 +1,15 @@
+
+#!/usr/bin/env python3
 import os
-import sys
-import json
 import pickle
-import hashlib
 import struct
-import math
-import random
+import hashlib
 import time
+import random
+import math
 from pathlib import Path
-from typing import Dict, List, Any, Tuple
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, asdict
 
 @dataclass
 class Shard:
@@ -17,135 +17,194 @@ class Shard:
     weights: List[float]
     biases: List[float]
     activation_count: int = 0
-    success_rate: float = 0.0
+    success_count: int = 0
     last_updated: float = 0.0
+    version: str = "2.5"
 
 class NeuralSharding:
-
-# Tambah di AWAL file revolver.py (baris 10-15):
-class NeuralSharding:
     def __init__(self):
-        self.shards_path = Path("data/brain.lvr")
-        self.shards_path.parent.mkdir(parents=True, exist_ok=True)  # ✅ AUTO CREATE
-        self.backup_path = Path("data/brain_backup.lvr")
-        self.backup_path.parent.mkdir(parents=True, exist_ok=True)  # ✅ BACKUP FOLDER
-        # ... rest of code
-
-    def __init__(self):
-        self.shards_path = Path("data/brain.lvr")
-        self.shards_path.parent.mkdir(parents=True, exist_ok=True)
-        self.backup_path = Path("data/brain_backup.lvr")
+        self.shard_dir = Path("data/shards")
+        self.shard_dir.mkdir(parents=True, exist_ok=True)
+        self.header_file = Path("data/brain.lvr")
+        self.backup_file = Path("data/brain_backup.lvr")
         self.shards: Dict[str, Shard] = {}
-        self.global_weights = [0.5] * 16  # 16 neuron global
-        self.global_biases = [0.0] * 16
-        self.learning_rate = 0.01
-        self.load_shards()
+        self.global_weights = [0.5] * 32  # 32 neurons
+        self.global_biases = [0.0] * 32
+        self.learning_rate = 0.02
+        self._init_header()
+        self.load_all_shards()
+
+    def _init_header(self):
+        """Auto-repair corrupt header"""
+        try:
+            if self.header_file.exists():
+                with open(self.header_file, "rb") as f:
+                    header = f.read(8)
+                    if len(header) != 8 or header[:4] != b"NANO":
+                        raise ValueError("Corrupt header")
+            else:
+                # Create fresh header
+                header_data = {
+                    "version": "2.5",
+                    "global_weights": self.global_weights,
+                    "global_biases": self.global_biases,
+                    "shard_count": 0,
+                    "timestamp": time.time()
+                }
+                with open(self.header_file, "wb") as f:
+                    pickle.dump(header_data, f)
+                self._backup()
+                print("🧬 brain.lvr header initialized")
+        except:
+            self._recover_from_backup()
+
+    def _recover_from_backup(self):
+        """Auto-restore from backup"""
+        try:
+            if self.backup_file.exists():
+                self.header_file.write_bytes(self.backup_file.read_bytes())
+                print("🧬 Recovered from backup")
+            else:
+                self._init_header()
+        except:
+            self._init_header()
+
+    def _backup(self):
+        """Atomic backup"""
+        try:
+            self.header_file.replace(self.backup_file)
+        except:
+            pass
 
     def sigmoid(self, x: float) -> float:
-        return 1 / (1 + math.exp(-math.tanh(x)))
+        if x > 10: return 1.0
+        if x < -10: return 0.0
+        return 1 / (1 + math.exp(-x))
 
     def sigmoid_deriv(self, x: float) -> float:
         s = self.sigmoid(x)
         return s * (1 - s)
 
-    def hash_intent(self, intent: str) -> str:
-        return hashlib.md5(intent.encode()).hexdigest()[:12]
+    def intent_hash(self, intent: str) -> str:
+        return hashlib.md5(intent.lower().encode()).hexdigest()[:8]
 
-    def load_shards(self):
-        try:
-            if self.shards_path.exists():
-                with open(self.shards_path, "rb") as f:
-                    data = pickle.load(f)
-                    self.shards = data.get("shards", {})
-                    self.global_weights = data.get("global_weights", [0.5] * 16)
-                    self.global_biases = data.get("global_biases", [0.0] * 16)
-        except:
-            self.shards = {}
+    def get_shard_path(self, shard_id: str) -> Path:
+        return self.shard_dir / f"{shard_id}.lvr"
 
-    def save_shards(self):
-        try:
-            self.backup()
-            data = {
-                "shards": self.shards,
-                "global_weights": self.global_weights,
-                "global_biases": self.global_biases,
-                "timestamp": time.time()
-            }
-            with open(self.shards_path, "wb") as f:
-                pickle.dump(data, f)
-            return True
-        except Exception as e:
-            print(f"❌ DNA Save Error: {e}")
-            return False
+    def create_shard(self, intent: str) -> str:
+        shard_id = self.intent_hash(intent)
+        shard_path = self.get_shard_path(shard_id)
+        
+        if not shard_path.exists():
+            shard = Shard(
+                intent=intent,
+                weights=[random.uniform(-1, 1) for _ in range(32)],
+                biases=[random.uniform(-0.5, 0.5) for _ in range(32)]
+            )
+            try:
+                with open(shard_path, "wb") as f:
+                    pickle.dump(asdict(shard), f)
+                self.shards[shard_id] = shard
+                self._update_header(shard_id)
+                print(f"🧬 Shard created: {shard_id}")
+            except:
+                pass
+        return shard_id
 
-    def backup(self):
+    def load_all_shards(self):
+        """Load all shards"""
+        self.shards.clear()
         try:
-            if self.shards_path.exists():
-                self.shards_path.replace(self.backup_path)
+            for shard_file in self.shard_dir.glob("*.lvr"):
+                try:
+                    with open(shard_file, "rb") as f:
+                        data = pickle.load(f)
+                        shard = Shard(**data)
+                        self.shards[shard.intent_hash(shard.intent)] = shard
+                except:
+                    shard_file.unlink()  # Delete corrupt shard
         except:
             pass
 
-    def create_shard(self, intent: str) -> str:
-        shard_id = self.hash_intent(intent)
-        if shard_id not in self.shards:
-            self.shards[shard_id] = Shard(
-                intent=intent,
-                weights=[random.uniform(0, 1) for _ in range(16)],
-                biases=[random.uniform(-0.5, 0.5) for _ in range(16)]
-            )
-        return shard_id
+    def _update_header(self, shard_id: str = None):
+        """Update header shard count"""
+        try:
+            header_data = {
+                "version": "2.5",
+                "global_weights": self.global_weights,
+                "global_biases": self.global_biases,
+                "shard_count": len(self.shards),
+                "timestamp": time.time()
+            }
+            with open(self.header_file, "wb") as f:
+                pickle.dump(header_data, f)
+            self._backup()
+        except:
+            pass
 
-    def forward_pass(self, shard_id: str, inputs: List[float]) -> List[float]:
+    def forward(self, shard_id: str, inputs: List[float]) -> List[float]:
+        """Neural forward pass"""
         if shard_id not in self.shards:
-            return [0.5] * 16
+            return [0.5] * 32
             
         shard = self.shards[shard_id]
         outputs = []
         
-        for i in range(16):
-            if i < len(inputs):
-                z = inputs[i] * shard.weights[i] + shard.biases[i]
-            else:
-                z = shard.biases[i]
+        for i in range(32):
+            inp = inputs[i] if i < len(inputs) else 0.0
+            z = inp * shard.weights[i] + shard.biases[i]
             outputs.append(self.sigmoid(z))
-            
+        
         shard.activation_count += 1
         return outputs
 
-    def backpropagate(self, shard_id: str, inputs: List[float], target: float, prediction: float, feedback: bool):
+    def mini_backprop(self, shard_id: str, inputs: List[float], target: float, feedback: bool):
+        """Pure Python backpropagation"""
         if shard_id not in self.shards:
             return
             
         shard = self.shards[shard_id]
+        prediction = max(self.forward(shard_id, inputs))
         error = target - prediction
         delta = error * self.sigmoid_deriv(prediction)
         
-        for i in range(min(16, len(inputs))):
-            shard.weights[i] += self.learning_rate * delta * inputs[i]
+        # Update weights & biases
+        for i in range(32):
+            inp = inputs[i] if i < len(inputs) else 0.0
+            shard.weights[i] += self.learning_rate * delta * inp
             shard.biases[i] += self.learning_rate * delta
-            
-        # Update success rate
-        shard.success_rate = (shard.success_rate * (shard.activation_count - 1) + (1 if feedback else 0)) / shard.activation_count
+        
+        # Update success metrics
+        if feedback:
+            shard.success_count += 1
         shard.last_updated = time.time()
         
-        # Global weight adjustment
-        gw_idx = int(shard_id[-1], 16) % len(self.global_weights)
-        self.global_weights[gw_idx] += 0.001 * delta
+        # Save shard
+        shard_path = self.get_shard_path(shard_id)
+        try:
+            with open(shard_path, "wb") as f:
+                pickle.dump(asdict(shard), f)
+        except:
+            pass
 
-    def get_recommendation(self, intent: str) -> Dict[str, Any]:
+    def analyze(self, intent: str) -> Dict[str, Any]:
+        """Get neural recommendation"""
         shard_id = self.create_shard(intent)
-        inputs = [ord(c) / 255.0 for c in intent[:16].ljust(16)[:16]]
-        outputs = self.forward_pass(shard_id, inputs)
+        inputs = [ord(c) % 256 / 255.0 for c in intent[:32]]
+        outputs = self.forward(shard_id, inputs)
         
         confidence = max(outputs)
-        action_type = "EVOLVE" if confidence > 0.7 else "OPTIMIZE" if confidence > 0.4 else "STABLE"
+        action = "EVOLVE" if confidence > 0.8 else "ADAPT" if confidence > 0.5 else "STABLE"
+        
+        shard = self.shards.get(shard_id, Shard(intent="", weights=[], biases=[]))
+        success_rate = shard.success_count / max(1, shard.activation_count)
         
         return {
             "shard_id": shard_id,
             "confidence": confidence,
-            "action_type": action_type,
-            "success_rate": self.shards[shard_id].success_rate,
-            "recommendation": f"{action_type}: {intent}"
+            "action": action,
+            "success_rate": success_rate,
+            "recommendation": f"{action} weights for '{intent}'"
         }
 
 class Revolver:
@@ -153,67 +212,59 @@ class Revolver:
         self.fs = fs
         self.backup = backup
         self.neural = NeuralSharding()
-        self.max_evolutions = 5
 
-    def status(self):
+    def status(self) -> str:
         total_shards = len(self.neural.shards)
-        avg_success = sum(s.success_rate for s in self.neural.shards.values()) / max(1, total_shards)
-        return f"🧬 DNA: {total_shards} shards | Success: {avg_success:.1%} | Global LR: {self.neural.learning_rate:.3f}"
+        avg_success = sum(s.success_count / max(1, s.activation_count) 
+                         for s in self.neural.shards.values())
+        avg_success = avg_success / max(1, total_shards)
+        return f"{total_shards} shards | {avg_success:.1%} success | LR:{self.neural.learning_rate:.3f}"
 
     def evolve(self, target_file: str, instruction: str) -> str:
         try:
-            # Neural shard analysis
-            shard_analysis = self.neural.get_recommendation(instruction)
-            print(f"🧠 Shard: {shard_analysis['shard_id']} | Conf: {shard_analysis['confidence']:.2f}")
+            # Neural analysis
+            analysis = self.neural.analyze(instruction)
+            print(f"🧠 [{analysis['shard_id']}] {analysis['confidence']:.2f} {analysis['action']}")
             
-            # Read target file with corruption check
+            # Read target
             content = self.fs.read(target_file)
             if not content:
-                return f"❌ Target {target_file} tidak ditemukan"
+                return f"❌ {target_file} not found"
             
-            # Generate evolution patch
-            patch = self._generate_patch(instruction, content, shard_analysis)
+            # Generate evolution
+            new_content = self._evolve_content(content, instruction, analysis)
             
-            # Apply evolution with backup
-            if self.backup.create() and self.fs.write(target_file, patch):
-                # Backpropagate success
-                inputs = [ord(c) / 255.0 for c in instruction[:16]]
-                self.neural.backpropagate(shard_analysis['shard_id'], inputs, 1.0, shard_analysis['confidence'], True)
-                self.neural.save_shards()
-                return f"✅ DNA EVOLVED: {target_file} | Shard: {shard_analysis['shard_id']}"
+            # Apply with backup
+            if self.backup.create() and self.fs.write(target_file, new_content):
+                # Positive feedback
+                inputs = [ord(c) % 256 / 255.0 for c in instruction[:32]]
+                self.neural.mini_backprop(analysis['shard_id'], inputs, 1.0, True)
+                return f"✅ EVOLVED {target_file} | {analysis['shard_id']}"
             else:
-                self.neural.backpropagate(shard_analysis['shard_id'], inputs, 0.0, shard_analysis['confidence'], False)
-                return "❌ DNA Corruption detected - Evolution rolled back"
-                
+                inputs = [ord(c) % 256 / 255.0 for c in instruction[:32]]
+                self.neural.mini_backprop(analysis['shard_id'], inputs, 0.0, False)
+                return "❌ Evolution failed - DNA protected"
         except Exception as e:
-            return f"💥 CRITICAL: {e} - DNA integrity preserved"
+            return f"💥 {e}"
 
-    def _generate_patch(self, instruction: str, content: str, analysis: Dict) -> str:
-        # Simple but effective code transformation based on neural output
-        lines = content.split('\n')
-        transformed = []
+    def _evolve_content(self, content: str, instruction: str, analysis: Dict) -> str:
+        """Intelligent code transformation"""
+        lines = content.splitlines()
+        evolved = []
         
         for line in lines:
             if 'def think' in line or 'def evolve' in line:
-                # Inject neural adaptation
-                prefix = "        # Neural Shard Adapted\n"
-                transformed.append(prefix + line)
-            elif analysis['confidence'] > 0.7 and 'return' in line:
-                # High confidence: enhance response
-                line = line.replace('return', 'return f"🧠 {analysis["action_type"]} " + ')
-                transformed.append(line)
-            else:
-                transformed.append(line)
+                evolved.append(f"        # Neural {analysis['shard_id']}: {analysis['action']}")
+            evolved.append(line)
         
-        # Add shard tracking
+        # Add neural footer
         footer = f"""
-    # Neural Shard: {analysis['shard_id']} | Success: {analysis['success_rate']:.1%}
+# Neural Shard: {analysis['shard_id']} | Success: {analysis['success_rate']:.1%}
+# Auto-evolved: {time.ctime()}
 """
-        return '\n'.join(transformed) + footer
+        return '\n'.join(evolved) + footer
 
     def feedback(self, shard_id: str, success: bool):
-        """Feedback loop for agent"""
-        inputs = [random.random() for _ in range(16)]  # Simulated agent inputs
-        pred = max(self.neural.forward_pass(shard_id, inputs))
-        self.neural.backpropagate(shard_id, inputs, 1.0 if success else 0.0, pred, success)
-        self.neural.save_shards()
+        """Agent feedback loop"""
+        inputs = [random.random() for _ in range(32)]
+        self.neural.mini_backprop(shard_id, inputs, 1.0 if success else 0.0, success)
