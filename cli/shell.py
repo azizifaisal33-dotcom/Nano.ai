@@ -1,70 +1,74 @@
-import sys
+#!/usr/bin/env python3
 import os
-from core.brain import Brain
+import sys
+import traceback
+from pathlib import Path
 
 class NanoShell:
-
-def __init__(self, brain=None):
-    os.makedirs("data", exist_ok=True)
-    os.makedirs("data/memory", exist_ok=True)
-    os.makedirs("data/knowledge", exist_ok=True)
-    
-    if brain is None:
-        self.brain = Brain()
-    else:
-        self.brain = brain
-
-    def __init__(self, brain=None):  # ✅ FIXED: Accept brain param
-        if brain is None:
-            self.brain = Brain()
-        else:
-            self.brain = brain
+    def __init__(self, brain=None):
+        self.root = Path(__file__).parent.parent
+        self.brain = self._load_brain(brain)
         self.running = True
+        self.history = []
+
+    def _load_brain(self, brain):
+        """Self-repairing brain loader"""
+        try:
+            sys.path.insert(0, str(self.root / 'core'))
+            from brain import Brain
+            return Brain()
+        except:
+            print("🧠 Brain repair mode...")
+            from revolver import Revolver
+            rev = Revolver()
+            rev.evolve_file("core/brain.py", "basic brain class")
+            from brain import Brain
+            return Brain()
 
     def start(self):
-        os.system('clear' if os.name=='posix' else 'cls')
-        print("🧠 Nano AI Shell (V2.5) - DNA Evolution Active")
-        print("Commands: evolve, agent, status, help | 'exit' to quit")
+        os.system('clear')
+        print("🧠 NanoAI v2.5 Cognitive Shell")
+        print("💬 Chat | $ command | agent goal | evolve file 'inst'")
         print("=" * 60)
 
         while self.running:
             try:
-                user_input = input("\n➜ ").strip()
-                if not user_input: 
+                user_input = input("🧠 ").strip()
+                if not user_input:
                     continue
-
-                if user_input.lower() in ["exit", "quit", "bye"]:
-                    print("👋 DNA preserved. Goodbye!")
+                
+                self.history.append(user_input)
+                
+                # Cognitive Routing
+                if user_input.lower() in ['exit', 'quit', 'bye']:
+                    print("👋 DNA preserved")
                     break
-
-                if user_input.lower() == "help":
-                    self.show_help()
-                    continue
-
-                result = self.brain.think(user_input)
-                print(result)
-
+                
+                if user_input.startswith('$'):
+                    # Raw shell
+                    result = os.popen(user_input[1:]).read()
+                    print(result or "OK")
+                
+                elif user_input.startswith(('evolve', 'agent')):
+                    # System commands
+                    result = self.brain.think(user_input)
+                    print(result)
+                
+                else:
+                    # Pure chat → brain
+                    result = self.brain.think(user_input)
+                    print(result)
+                
             except KeyboardInterrupt:
-                print("\n⛔ Interrupted")
+                print("\n⏹️ Interrupted")
                 break
             except Exception as e:
-                print(f"❌ Error: {e}")
+                tb = traceback.format_exc()
+                print(f"💥 {e}")
+                self.brain.agent.self_heal(tb) if hasattr(self.brain, 'agent') else None
 
-    def show_help(self):
-        print("""
-🔫 DNA EVOLUTION COMMANDS:
-  evolve core/brain.py "jawab santai dan fun"
-  evolve core/nano.py "tambah fitur baru"
-
-🤖 AGENT MODE:
-  agent buat file test.py dengan hello world
-
-📊 SYSTEM:
-  status    - Brain + DNA status
-  help      - This help
-  exit      - Shutdown
-        """)
+    def status(self):
+        return f"History: {len(self.history)} | Brain: {getattr(self.brain, 'session_id', 'OK')}"
 
 if __name__ == "__main__":
-    shell = NanoShell()
-    shell.start()
+    NanoShell().start()
