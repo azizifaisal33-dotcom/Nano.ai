@@ -1,11 +1,10 @@
-import os
-import hashlib
 import re
+import hashlib
 from pathlib import Path
 
 
 # =========================
-# PATH
+# STORAGE PATH
 # =========================
 KB_PATH = Path("data/knowledge/base.txt")
 KB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -17,28 +16,22 @@ KB_PATH.parent.mkdir(parents=True, exist_ok=True)
 def normalize(text):
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"[^\w\s]", "", text)  # remove symbol
+    text = re.sub(r"[^\w\s]", "", text)
     return text
 
 
 # =========================
-# HASH KEY (ANTI DUPLICATE)
+# HASH (ANTI DUPLICATE)
 # =========================
 def make_key(q, a):
     return hashlib.md5(f"{q}|{a}".encode()).hexdigest()
 
 
 # =========================
-# VALIDATOR (FILTER SAMPAH)
+# VALIDATOR
 # =========================
 def is_valid(q, a):
-    blacklist = [
-        "error",
-        "gagal",
-        "unknown",
-        "none",
-        "tidak tahu"
-    ]
+    blacklist = ["error", "gagal", "unknown", "none", "tidak tahu"]
 
     if len(q) < 2 or len(a) < 2:
         return False
@@ -46,7 +39,7 @@ def is_valid(q, a):
     if any(b in a.lower() for b in blacklist):
         return False
 
-    if len(q) > 80 or len(a) > 200:
+    if len(q) > 100 or len(a) > 300:
         return False
 
     return True
@@ -55,7 +48,7 @@ def is_valid(q, a):
 # =========================
 # LOAD EXISTING KEYS
 # =========================
-def load_existing():
+def load_existing_keys():
     keys = set()
 
     if not KB_PATH.exists():
@@ -71,7 +64,26 @@ def load_existing():
 
 
 # =========================
-# ADD KNOWLEDGE (MAIN FUNCTION)
+# SEARCH KNOWLEDGE
+# =========================
+def search_knowledge(text):
+    if not KB_PATH.exists():
+        return None
+
+    text = normalize(text)
+
+    with open(KB_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            if "|" in line:
+                q, a = line.strip().split("|", 1)
+                if q in text:
+                    return a
+
+    return None
+
+
+# =========================
+# ADD KNOWLEDGE (MAIN API)
 # =========================
 def add_knowledge(question, answer):
     question = normalize(question)
@@ -81,10 +93,10 @@ def add_knowledge(question, answer):
         return False
 
     key = make_key(question, answer)
-    existing = load_existing()
+    existing = load_existing_keys()
 
     if key in existing:
-        return False  # duplicate
+        return False
 
     with open(KB_PATH, "a", encoding="utf-8") as f:
         f.write(f"{question}|{answer}\n")
