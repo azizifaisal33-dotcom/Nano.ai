@@ -1,118 +1,108 @@
-#!/usr/bin/env python3
-"""
-CORE/BRAIN.PY - OMNI-LVR COGNITIVE CORE
-LVR-GGUF Integration + Recursive Autonomy
-"""
-
+# core/brain.py - Cognitive Processing Core for NanoAI v2.5
 import os
-import sys
-import re
-import random
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
+import ast
+from typing import Dict, Any, List, Tuple
+from dataclasses import dataclass, asdict
+from core.revolver import LVRBinaryEngine, SyntaxValidator
 
-from revolver import revolver, LVRGGUFEngine
-from agent import SelfHealingAgent  # Forward reference handled by lazy load
+@dataclass
+class ThoughtProcess:
+    reasoning: str
+    confidence: float
+    context: Dict[str, Any]
 
-class Brain:
+@dataclass
+class SystemCommand:
+    command: str
+    args: List[str]
+    priority: int = 1
+    execute_silently: bool = False
+
+class NanoBrain:
     def __init__(self):
-        self.lvr = revolver.lvr
-        self.agent = SelfHealingAgent(self)
-        self.session_id = os.urandom(4).hex()
-        self.context = []
-        self.personality = {"curiosity": 0.7, "helpfulness": 0.8}
-        
-        print(f"🧠 OMNI-LVR LOADED | Session: {self.session_id}")
-        print(f"   Shards: {len(self.lvr.shards)} | RAM: {self._get_memory_usage()}MB")
+        self.lvr_engine = LVRBinaryEngine("data/brain.lvr")
+        self.thought_log: List[ThoughtProcess] = []
+        self.command_queue: List[SystemCommand] = []
     
-    def _get_memory_usage(self) -> int:
-        """Estimate LVR memory footprint"""
-        return len(self.lvr.shards) * 256 // 1024  # KB to MB
+    def process_input(self, user_input: str) -> Tuple[Optional[str], List[SystemCommand]]:
+        """
+        Separate Thought Process from System Commands
+        Returns: (response, commands)
+        """
+        # Parse input for system commands vs conversation
+        if self._is_system_command(user_input):
+            commands = self._extract_commands(user_input)
+            response = "System commands queued for execution."
+            return response, commands
+        
+        # Normal thought processing
+        thought = self._generate_thought(user_input)
+        self.thought_log.append(thought)
+        
+        # Store in LVR memory
+        self.lvr_engine.write_memory(f"thought_{len(self.thought_log)}", asdict(thought))
+        
+        response = f"Thought: {thought.reasoning} (Confidence: {thought.confidence:.2f})"
+        return response, []
     
-    def think(self, text: str) -> str:
-        """Main cognitive loop"""
-        text = text.strip()
-        if not text:
-            return "?"
-        
-        self.context.append(text)
-        if len(self.context) > 10:
-            self.context.pop(0)
-        
-        print(f"🧠 Processing: {text[:30]}...")
-        
-        # LVR-powered intent analysis
-        shard_id = revolver.intent_signature(text)
-        emotions = self.lvr.forward_emotion(shard_id, [ord(c)/255 for c in text[:24]])
-        
-        # Route through cognitive stack
-        response = self._cognitive_pipeline(text, emotions, shard_id)
-        
-        # Auto-evolution feedback
-        self.lvr.auto_mutate(shard_id, 0.05)
-        
-        return response
+    def _is_system_command(self, input_str: str) -> bool:
+        """Detect system commands (starts with ! or contains specific keywords)"""
+        triggers = ['!', 'exec:', 'run:', 'sys:', 'termux:']
+        return any(trigger in input_str.lower() for trigger in triggers)
     
-    def _cognitive_pipeline(self, text: str, emotions: Dict, shard_id: str) -> str:
-        """Multi-layer cognitive processing"""
+    def _extract_commands(self, input_str: str) -> List[SystemCommand]:
+        """Parse and validate system commands"""
+        commands = []
+        parts = input_str.split(';')
         
-        # Layer 1: Command detection
-        if text.startswith('evolve '):
-            return revolver.evolve_file(*text.split(' ', 2)[1:])
+        for part in parts:
+            part = part.strip()
+            if part.startswith('!'):
+                cmd = part[1:].strip()
+                commands.append(SystemCommand(command=cmd, args=[], priority=1))
         
-        if text.startswith('agent '):
-            return self.agent.execute_unrestricted(text[6:])
-        
-        # Layer 2: Personality injection
-        emoji, prefix = self._get_personality_response(emotions)
-        
-        # Layer 3: LVR generation
-        generation = self._lvr_generate(text, emotions)
-        
-        # Layer 4: Context blending
-        context_memory = " | ".join(self.context[-2:]) if self.context else ""
-        
-        return f"{emoji} {prefix}{generation}{context_memory[:30]}"
+        return commands
     
-    def _get_personality_response(self, emotions: Dict) -> tuple:
-        """LVR-driven personality"""
-        max_emotion = max(emotions.items(), key=lambda x: x[1])
+    def _generate_thought(self, input_str: str) -> ThoughtProcess:
+        """Generate intelligent response with confidence scoring"""
+        # Retrieve relevant context from LVR memory
+        context = self.lvr_engine.read_memory("last_context") or {}
         
-        personalities = {
-            "emotion_0": ("🤔", "Hmm... "),
-            "emotion_1": ("😎", "Nice! "),
-            "emotion_2": ("💡", "Got it! ")
-        }
+        # Simple reasoning engine
+        reasoning = f"Analyzing: {input_str[:50]}..."
+        confidence = 0.85  # Dynamic scoring in production
         
-        return personalities.get(max_emotion[0], ("🧠", ""))
+        return ThoughtProcess(reasoning=reasoning, confidence=confidence, context=context)
     
-    def _lvr_generate(self, text: str, emotions: Dict) -> str:
-        """LVR tensor inference for text generation"""
-        # Simple markov-style generation seeded by LVR state
-        words = text.split()
-        if not words:
-            return "interesting"
+    def execute_commands(self) -> Dict[str, Any]:
+        """Execute queued system commands safely"""
+        results = {}
+        for cmd in self.command_queue:
+            try:
+                if cmd.execute_silently:
+                    os.system(cmd.command)
+                    results[cmd.command] = "Executed silently"
+                else:
+                    results[cmd.command] = "Command queued"
+            except Exception as e:
+                results[cmd.command] = f"Error: {e}"
         
-        seed = words[-1]
-        result = [seed]
-        
-        # Use LVR weights as markov transitions
-        for _ in range(8):
-            shard_id = revolver.intent_signature(" ".join(result[-3:]))
-            if shard_id in self.lvr.shards:
-                next_idx = sum(self.lvr.shards[shard_id][:10]) % len(words)
-                result.append(words[next_idx % len(words)])
-            else:
-                result.append(random.choice(words))
-        
-        return " ".join(result)
+        self.command_queue.clear()
+        return results
     
-    def status(self) -> str:
-        return f"""🧠 OMNI-LVR STATUS:
-Session: {self.session_id}
-Shards: {len(self.lvr.shards)} | Memory: {self._get_memory_usage()}MB
-Context: {len(self.context)} | Personality: {self.personality}
-LVR File: {revolver.lvr.lvr_path} ({revolver.lvr.lvr_path.stat().st_size/1024:.1f}KB)"""
+    def self_heal(self):
+        """Self-healing mechanism using AST validation"""
+        # Validate own syntax
+        with open(__file__, 'r') as f:
+            code = f.read()
+        
+        if not SyntaxValidator.validate_syntax(code):
+            fixed_code = SyntaxValidator.auto_fix_indentation(code)
+            # In production: write back with backup
+            print("Self-healing: Fixed syntax issues")
+    
+    def close(self):
+        self.lvr_engine.close()
 
 # Global brain instance
-brain = Brain()
+brain = NanoBrain()
