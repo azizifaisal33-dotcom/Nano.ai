@@ -2,26 +2,15 @@ import sqlite3
 import json
 from pathlib import Path
 import hashlib
-from datetime import datetime
 
 
 # =========================
-# SIMPLE SEMANTIC NORMALIZER
+# SEMANTIC KEY
 # =========================
-def semantic_key(text: str) -> str:
+def semantic_key(text):
     text = text.lower()
-
-    replace_map = {
-        "cara": "",
-        "bagaimana": "",
-        "tolong": "",
-        "saya": "",
-        "aku": "",
-    }
-
-    for k, v in replace_map.items():
-        text = text.replace(k, v)
-
+    for w in ["cara", "bagaimana", "tolong", "aku", "saya"]:
+        text = text.replace(w, "")
     text = " ".join(text.split())
     return hashlib.md5(text.encode()).hexdigest()
 
@@ -37,9 +26,6 @@ class NanoMemory:
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._init_schema()
 
-    # =========================
-    # INIT DB
-    # =========================
     def _init_schema(self):
         self.conn.executescript("""
         CREATE TABLE IF NOT EXISTS conversations (
@@ -48,20 +34,8 @@ class NanoMemory:
             user_input TEXT,
             ai_response TEXT,
             intent TEXT,
-            tool_used TEXT,
-            success INTEGER,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            metadata TEXT,
-            semantic_key TEXT,
-            category TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS sessions (
-            session_id TEXT PRIMARY KEY,
-            name TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_active DATETIME,
-            message_count INTEGER DEFAULT 0
+            semantic_key TEXT
         );
         """)
         self.conn.commit()
@@ -69,71 +43,36 @@ class NanoMemory:
     # =========================
     # ADD MEMORY
     # =========================
-    def add(self, session_id, user_input, ai_response,
-            intent="unknown", tool_used="none",
-            success=True, metadata=None, category="general"):
-
-        if metadata is None:
-            metadata = {}
-
+    def add(self, session_id, user_input, ai_response, intent="chat"):
         key = semantic_key(user_input)
 
         self.conn.execute("""
         INSERT INTO conversations
-        (session_id, user_input, ai_response, intent, tool_used,
-         success, timestamp, metadata, semantic_key, category)
-        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
-        """, (
-            session_id,
-            user_input,
-            ai_response,
-            intent,
-            tool_used,
-            int(success),
-            json.dumps(metadata),
-            key,
-            category
-        ))
-
-        # update session
-        self.conn.execute("""
-        INSERT INTO sessions (session_id, name, last_active, message_count)
-        VALUES (?, ?, CURRENT_TIMESTAMP, 1)
-        ON CONFLICT(session_id)
-        DO UPDATE SET
-            last_active=CURRENT_TIMESTAMP,
-            message_count=message_count+1
-        """, (session_id, f"Session-{session_id[:8]}"))
+        (session_id, user_input, ai_response, intent, semantic_key)
+        VALUES (?, ?, ?, ?, ?)
+        """, (session_id, user_input, ai_response, intent, key))
 
         self.conn.commit()
 
     # =========================
-    # NORMAL SEARCH
+    # SEARCH
     # =========================
-    def search(self, query, session_id=None, limit=10):
+    def search(self, query):
         self.conn.row_factory = sqlite3.Row
 
-        sql = """
+        cur = self.conn.execute("""
         SELECT * FROM conversations
         WHERE user_input LIKE ?
-        """
+        ORDER BY timestamp DESC
+        LIMIT 10
+        """, (f"%{query}%",))
 
-        params = [f"%{query}%"]
-
-        if session_id:
-            sql += " AND session_id=?"
-            params.append(session_id)
-
-        sql += " ORDER BY timestamp DESC LIMIT ?"
-        params.append(limit)
-
-        cur = self.conn.execute(sql, params)
         return [dict(r) for r in cur.fetchall()]
 
     # =========================
-    # SEMANTIC SEARCH (NEW 🔥)
+    # SEMANTIC SEARCH
     # =========================
-    def semantic_search(self, query, limit=10):
+    def semantic_search(self, query):
         key = semantic_key(query)
 
         self.conn.row_factory = sqlite3.Row
@@ -142,32 +81,11 @@ class NanoMemory:
         SELECT * FROM conversations
         WHERE semantic_key = ?
         ORDER BY timestamp DESC
-        LIMIT ?
-        """, (key, limit))
+        LIMIT 10
+        """, (key,))
 
         return [dict(r) for r in cur.fetchall()]
 
-    # =========================
-    # CATEGORY SEARCH (NEW 🔥)
-    # =========================
-    def search_category(self, category):
-        self.conn.row_factory = sqlite3.Row
 
-        cur = self.conn.execute("""
-        SELECT * FROM conversations
-        WHERE category = ?
-        ORDER BY timestamp DESC
-        """, (category,))
-
-        return [dict(r) for r in cur.fetchall()]
-
-    # =========================
-    # SESSION HISTORY
-    # =========================
-    def history(self, session_id, limit=50):
-        self.conn.row_factory = sqlite3.Row
-
-        cur = self.conn.execute("""
-        SELECT * FROM conversations
-        WHERE session_id=?
-        ORDER
+# GLOBAL
+memory = NanoMemory()
