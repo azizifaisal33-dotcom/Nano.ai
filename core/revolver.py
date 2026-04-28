@@ -21,6 +21,16 @@ class Shard:
     last_updated: float = 0.0
 
 class NeuralSharding:
+
+# Tambah di AWAL file revolver.py (baris 10-15):
+class NeuralSharding:
+    def __init__(self):
+        self.shards_path = Path("data/brain.lvr")
+        self.shards_path.parent.mkdir(parents=True, exist_ok=True)  # ✅ AUTO CREATE
+        self.backup_path = Path("data/brain_backup.lvr")
+        self.backup_path.parent.mkdir(parents=True, exist_ok=True)  # ✅ BACKUP FOLDER
+        # ... rest of code
+
     def __init__(self):
         self.shards_path = Path("data/brain.lvr")
         self.shards_path.parent.mkdir(parents=True, exist_ok=True)
