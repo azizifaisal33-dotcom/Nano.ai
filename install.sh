@@ -3,35 +3,41 @@
 echo "🧠 NANO AI INSTALLER START"
 
 # =====================
-# UPDATE TERMUX
+# UPDATE & REPO SETUP
 # =====================
 pkg update -y && pkg upgrade -y
+pkg install -y x11-repo tur-repo
 
 # =====================
 # INSTALL DEPENDENCY
 # =====================
-pkg install -y python git
+pkg install -y python python-torch python-numpy libjpeg-turbo git
 
 # =====================
 # PYTHON SETUP
 # =====================
 pip install --upgrade pip
+pip install transformers safetensors
 
-# kalau ada requirements
-if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
-fi
+# =====================
+# DIRECTORY SETUP
+# =====================
+mkdir -p data/memory
+mkdir -p models
+touch core/__init__.py
 
 # =====================
 # PERMISSION
 # =====================
-chmod +x cli/runner.py
+chmod +x main.py
 
 # =====================
 # GLOBAL COMMAND
 # =====================
-cp cli/runner.py $PREFIX/bin/nanoai
+# Pastikan path ini sesuai dengan file utama NanoAI kamu
+cp main.py $PREFIX/bin/nanoai
+chmod +x $PREFIX/bin/nanoai
 
 echo ""
 echo "✅ INSTALL SELESAI"
-echo "Gunakan: nanoai"
+echo "Ketik 'nanoai' untuk menjalankan asistenmu."
