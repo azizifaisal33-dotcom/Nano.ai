@@ -1,11 +1,10 @@
-# 🧠 Nano AI v2 - Neural Termux Brain
+# 🧠 NanoAI - Self-Evolving AI Brain
 
-**3500+ LOC Production AI Agent** untuk Termux
+100% Python, Zero Dependencies, Termux-Ready!
 
-## 🚀 Install & Run
-
+## 🚀 Quick Start
 ```bash
-git clone https://github.com/YOUR_USERNAME/nano-ai
-cd nano-ai
-bash setup.sh
-python run.py
+git clone https://github.com/yourusername/NanoAI
+cd NanoAI
+bash install.sh
+python main.py
