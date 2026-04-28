@@ -7,6 +7,23 @@ from typing import List, Dict, Any
 import struct
 
 class Revolver:
+
+def __init__(self, fs, backup):
+    self.fs = fs
+    self.backup = backup
+    self.dna_path = Path("data/brain.lvr")
+    self.dna_path.parent.mkdir(exist_ok=True)
+    
+    # ✅ FORCE CLEAN DNA CORRUPTION
+    if self.dna_path.exists():
+        try:
+            self.dna_path.unlink()  # Delete corrupted file
+            print("🧬 Corrupted DNA deleted")
+        except:
+            pass
+    
+    self.dna = {}  # Fresh DNA
+    print("🔫 Revolver: Fresh DNA initialized ✓")
     def __init__(self, fs, backup):
         self.fs = fs
         self.backup = backup
