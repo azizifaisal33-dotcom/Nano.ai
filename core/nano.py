@@ -1,15 +1,18 @@
 """
-🧠 NanoAI v2 - Master Neural Brain
-Full AI orchestration pipeline
+🧠 NanoAI v2 - Master Neural Brain (Clean Version)
+Full AI orchestration pipeline without NumPy
 """
-import numpy as np
+
+import random
 from typing import Dict, List, Any, Optional
 from core.tokenizer import tokenizer
 from core.vector import vectorstore
 from core.intent import intent_engine
 from core.memory import memory
 from core.generator import generator
-from core.engine import NanoEngine  # Will be defined later
+from core.engine import NanoEngine
+from core.math_utils import NanoMath # Menggunakan utilitas buatan sendiri
+from core.revolver import revolver    # Integrasi mesin evolusi
 from rich.console import Console
 from rich.panel import Panel
 
@@ -29,11 +32,11 @@ class NanoAI:
         
         # 2. INTENT DETECTION
         intents = intent_engine.detect(user_input)
-        top_intent = intents[0] if intents else None
+        top_intent = intents if intents else None
         self.console.print(f"🎯 Top intent: {top_intent.name if top_intent else 'unknown'}")
         
-        # 3. VECTOR MEMORY SEARCH
-        query_embedding = self._dummy_embedding(token_ids)  # Placeholder
+        # 3. VECTOR MEMORY SEARCH (Pure Python Embedding)
+        query_embedding = self._dummy_embedding(token_ids)
         similar = vectorstore.search(query_embedding, k=3)
         memory_hit = bool(similar)
         
@@ -58,7 +61,11 @@ class NanoAI:
             input_text=user_input
         )
         
-        # 6. LEARN & STORE
+        # 6. LEARN & EVOLVE (Revolver Integration)
+        # Sekarang NanoAI otomatis melatih Revolver setiap kali ada input
+        revolver.evolve(user_input.split())
+        
+        # 7. MEMORY UPDATE
         memory.add_conversation(
             session_id=self.session_id,
             user_input=user_input,
@@ -68,7 +75,7 @@ class NanoAI:
             success=execution_result['success']
         )
         
-        # 7. VECTOR UPDATE
+        # 8. VECTOR STORE UPDATE
         vectorstore.add(user_input, query_embedding, {
             'intent': top_intent.name if top_intent else 'unknown',
             'session': self.session_id
@@ -86,14 +93,17 @@ class NanoAI:
             'success': execution_result['success']
         }
 
-    def _dummy_embedding(self, token_ids: List[int]) -> np.ndarray:
-        """Placeholder embedding - replace with real model"""
-        # Simple hash-based embedding
+    def _dummy_embedding(self, token_ids: List[int]) -> List[float]:
+        """Placeholder embedding - Menggunakan Python murni (Tanpa NumPy)"""
+        # Gunakan sum dari token sebagai seed agar hasilnya konsisten untuk input yang sama
         seed = sum(token_ids) % 1000
-        np.random.seed(seed)
-        return np.random.normal(0, 1, 384).astype('float32')
+        random.seed(seed)
+        
+        # Membuat vektor 384 dimensi (standar model AI ringan)
+        embedding = [random.uniform(-1, 1) for _ in range(384)]
+        return embedding
 
-    def _build_command(self, intent_match: 'IntentMatch', input_text: str) -> str:
+    def _build_command(self, intent_match: Any, input_text: str) -> str:
         """Dynamic command construction"""
         if intent_match.name == 'package_install':
             pkg = intent_match.entities.get('arg1', 'python')
@@ -119,5 +129,5 @@ class NanoAI:
         )
         self.console.print(panel)
 
-# Global brain
+# Global instance
 nano_ai = NanoAI()
