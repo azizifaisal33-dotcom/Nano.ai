@@ -113,4 +113,93 @@ class Brain:
         if text.startswith("evolve"):
             parts = text.split(" ", 2)
 
-            if
+            if len(parts) < 3:
+                return "format: evolve <file> <instruction>"
+
+            return self.revolver.evolve(parts[1], parts[2])
+
+        return None
+
+
+    # =========================
+    # PLUGIN / COMMAND THINK ENGINE
+    # =========================
+    def think(self, text):
+        text = text.strip().lower()
+
+        # log input
+        self.remember(text, "input_received", intent="input")
+
+        # -------------------------
+        # AGENT MODE
+        # -------------------------
+        res = self.handle_agent(text)
+        if res:
+            self.remember(text, str(res), intent="agent", success=True)
+            return res
+
+        # -------------------------
+        # EVOLVE MODE
+        # -------------------------
+        res = self.handle_evolve(text)
+        if res:
+            self.remember(text, str(res), intent="evolve", success=True)
+            return res
+
+        # -------------------------
+        # COMMAND AI GENERATION
+        # -------------------------
+        cmds = self.cmd_ai.generate(text)
+
+        last_error = ""
+
+        for c in cmds:
+            c = safe_command(c)
+
+            if not c:
+                continue
+
+            try:
+                result = engine.run(c)
+
+                if result.get("success"):
+                    output = f"⚙️ {c}\n{result['output']}"
+                    self.remember(text, output, intent="execute", success=True)
+                    return output
+
+                last_error = result.get("output")
+
+            except Exception as e:
+                last_error = str(e)
+
+        # fallback
+        fallback = f"❌ gagal\n{last_error if last_error else 'no output'}"
+
+        self.remember(text, fallback, intent="error", success=False)
+        return fallback
+
+
+# =========================
+# RUNNER
+# =========================
+if __name__ == "__main__":
+    brain = Brain()
+
+    print("\n💬 Nano AI ACTIVE\n")
+
+    while True:
+        try:
+            user = input("you> ")
+
+            if user in ["exit", "quit"]:
+                print("bye")
+                break
+
+            print("\n🧠 AI:\n", brain.think(user), "\n")
+
+        except KeyboardInterrupt:
+            print("\nbye")
+            break
+
+        except Exception as e:
+            print("⚠️ error:", e)
