@@ -2,12 +2,10 @@ import re
 import json
 from typing import List, Dict, Tuple, Optional
 from collections import Counter, defaultdict
-# import numpy as np  <-- SUDAH DIHAPUS
-from rich.console import Console
 
 class NanoTokenizer:
     def __init__(self, vocab_size: int = 5000):
-        self.console = Console()
+        # self.console = Console() <-- SUDAH DIHAPUS (Penyebab NameError)
         self.vocab_size = vocab_size
         self.special_tokens = {
             'PAD': 0, 'UNK': 1, 'CLS': 2, 'SEP': 3, 'MASK': 4
@@ -40,7 +38,8 @@ class NanoTokenizer:
             vocab[token] = i
             id_to_token[i] = token
 
-        self.console.print(f"[green]✓ Tokenizer vocab: {len(vocab)} tokens[/]")
+        # Menggunakan print biasa (tanpa rich)
+        print(f"✓ Tokenizer vocab: {len(vocab)} tokens")
         return vocab, id_to_token
 
     def encode(self, text: str, max_len: Optional[int] = None) -> List[int]:
