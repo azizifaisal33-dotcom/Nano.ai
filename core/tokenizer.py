@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 
 class NanoTokenizer:
     def __init__(self, vocab_size: int = 5000):
-        # self.console = Console() <-- SUDAH DIHAPUS (Penyebab NameError)
+        # self.console = Console()  <-- SUDAH DIHAPUS agar tidak NameError
         self.vocab_size = vocab_size
         self.special_tokens = {
             'PAD': 0, 'UNK': 1, 'CLS': 2, 'SEP': 3, 'MASK': 4
@@ -38,7 +38,7 @@ class NanoTokenizer:
             vocab[token] = i
             id_to_token[i] = token
 
-        # Menggunakan print biasa (tanpa rich)
+        # Ganti self.console.print menjadi print biasa
         print(f"✓ Tokenizer vocab: {len(vocab)} tokens")
         return vocab, id_to_token
 
@@ -62,24 +62,20 @@ class NanoTokenizer:
         return token_ids[:max_len]
 
     def batch_encode(self, texts: List[str], max_len: int = 512) -> List[List[int]]:
-        """Batch processing using pure Python lists"""
         return [self.encode(text, max_len) for text in texts]
 
     def decode(self, token_ids: List[int]) -> str:
-        """Decode back to text"""
         tokens = [self.id_to_token.get(tid, '[UNK]') for tid in token_ids]
         text_tokens = [t for t in tokens if t not in ['PAD', 'CLS', 'SEP', 'UNK']]
         return ' '.join(text_tokens).strip()
 
     def _clean_text(self, text: str) -> str:
-        """Advanced text cleaning"""
         text = re.sub(r'\s+', ' ', text)
         text = re.sub(r'[^\w\s\.\,\!\?\:\;\-\$$]', ' ', text)
         text = text.lower().strip()
         return text
 
     def _bpe_tokenize(self, text: str) -> List[str]:
-        """Byte Pair Encoding"""
         words = text.split()
         tokens = []
         for word in words:
@@ -91,7 +87,6 @@ class NanoTokenizer:
         return tokens
 
     def _split_subwords(self, word: str) -> List[str]:
-        """Greedy BPE splitting"""
         if len(word) <= 3:
             return [word]
         for split_len in range(len(word), 2, -1):
