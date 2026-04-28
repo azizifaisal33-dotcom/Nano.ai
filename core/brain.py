@@ -6,6 +6,7 @@ from core.revolver import Revolver
 from core.engine import engine
 from core.memory import memory
 from core.knowledge_builder import search_knowledge, add_knowledge
+from core.generator import NanoGenerator
 
 
 # =========================
@@ -43,17 +44,20 @@ class Brain:
         self.cmd_ai = CommandAI()
         self.agent = Agent(self)
 
-        # FIX IMPORTANT (dependency injection)
+        # dependency injection (fix revolver)
         self.fs = FileSystem()
         self.backup = Backup()
         self.revolver = Revolver(self.fs, self.backup)
+
+        # generator AI (NEW)
+        self.generator = NanoGenerator()
 
         self.session_id = str(uuid.uuid4())[:10]
 
         print("🧠 Nano AI BRAIN ONLINE")
 
     # =========================
-    # MEMORY
+    # MEMORY SYSTEM
     # =========================
     def remember(self, user_input, ai_output, intent="chat", success=True):
         memory.add(
@@ -87,6 +91,11 @@ class Brain:
     # =========================
     def think(self, text):
         text = text.strip().lower()
+
+        # =========================
+        # GENERATOR LEARNING (AUTO)
+        # =========================
+        self.generator.train(text)
 
         # =========================
         # 1. KNOWLEDGE LAYER
@@ -125,35 +134,4 @@ class Brain:
             return res
 
         # =========================
-        # 5. COMMAND EXECUTION
-        # =========================
-        cmds = self.cmd_ai.generate(text)
-
-        last_error = ""
-
-        for c in cmds:
-            c = safe_command(c)
-            if not c:
-                continue
-
-            try:
-                result = engine.run(c)
-
-                if result.get("success"):
-                    output = f"⚙️ {c}\n{result['output']}"
-                    self.remember(text, output, "command")
-                    add_knowledge(text, result["output"])
-                    return output
-
-                last_error = result.get("output")
-
-            except Exception as e:
-                last_error = str(e)
-
-        # =========================
-        # 6. CHAT FALLBACK
-        # =========================
-        res = self.chat(text)
-        self.remember(text, res, "chat")
-        add_knowledge(text, res)
-        return res
+        #
