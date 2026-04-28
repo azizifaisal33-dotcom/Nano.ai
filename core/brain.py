@@ -1,8 +1,9 @@
 import uuid
 import os
+import shutil
 from core.command_ai import CommandAI
 from core.agent import Agent
-from core.revolver import Revolver  # ✅ ADDED
+from core.revolver import Revolver
 from core.memory import memory
 from core.knowledge_builder import search_knowledge
 from core.generator import NanoGenerator
@@ -28,7 +29,6 @@ class FileSystem:
 class Backup:
     def create(self):
         try:
-            import shutil
             if os.path.exists("core/brain.py"):
                 shutil.copy("core/brain.py", "core/brain_backup.py")
             return True
@@ -39,16 +39,16 @@ def safe_command(cmd):
     return None if any(b in cmd.lower() for b in blacklist) else cmd
 
 # =========================
-# BRAIN CLASS
+# BRAIN CLASS - FIXED
 # =========================
 class Brain:
     def __init__(self):
         self.cmd_ai = CommandAI()
-        self.agent = Agent(self)
         self.fs = FileSystem()
         self.backup = Backup()
-        self.revolver = Revolver(self.fs, self.backup)  # ✅ FIXED
+        self.revolver = Revolver(self.fs, self.backup)
         self.generator = NanoGenerator()
+        self.agent = Agent(self)
         self.session_id = str(uuid.uuid4())[:8]
         print(f"🧠 Nano BRAIN v2.5 | Session: {self.session_id}")
 
@@ -102,7 +102,7 @@ class Brain:
 
         mem = memory.search(text)
         if mem:
-            return f"💾 Memory: {mem[0]['ai_response']}"
+            return f"💾 Memory: {mem[0].get('ai_response', 'N/A')}"
 
         # 6. COMMAND AI
         commands = self.cmd_ai.generate(text)
@@ -115,13 +115,25 @@ class Brain:
 
     def status(self):
         try:
-            return f"""🧠 BRAIN STATUS:
+            agent_status = "ready"
+            try:
+                agent_status = self.agent.agent.status()
+            except:
+                agent_status = "v2.5"
+                
+            mem_count = 0
+            try:
+                mem_count = len(memory.search(''))
+            except:
+                pass
+                
+            return f"""🧠 BRAIN STATUS v2.5:
 📱 Session: {self.session_id}
 🔫 DNA: {self.revolver.status()}
-🤖 Agent: {self.agent.agent.status()}
-💾 Memory: {len(memory.search(''))} records"""
-        except:
-            return "🧠 Brain ready!"
+🤖 Agent: {agent_status}
+💾 Memory: {mem_count} records"""
+        except Exception as e:
+            return f"🧠 Brain ready! ({e})"
 
     def remember(self, user_input, ai_output, intent="chat"):
         try:
