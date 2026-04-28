@@ -1,28 +1,25 @@
+
 import os
 
-
-class Config:
+class NanoConfig:
     def __init__(self):
-        self.debug = True
-        self.model_path = self.find_model()
+        self.AGENT_NAME = "NanoAI"
+        self.OWNER_NAME = "Yeshie"
+        self.VERSION = "2.0-STABLE-LOCAL"
+        
+        self.LOCAL_HOST = "127.0.0.1"
+        self.LOCAL_PORT = "11434"
+        self.ENDPOINT = f"http://{self.LOCAL_HOST}:{self.LOCAL_PORT}/api/chat"
+        self.AI_MODEL = "qwen2:1.5b"
+        
+        self.ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+        self.SYSTEM_DATA = os.path.join(self.ROOT_DIR, "data", "memory", "system.json")
 
-    def find_model(self):
-        # models folder
-        if os.path.exists("./models/model.gguf"):
-            return "./models/model.gguf"
+    def get_core_instruction(self):
+        return (
+            f"Role: {self.AGENT_NAME}. User: {self.OWNER_NAME}. "
+            "Expertise: Android Dev (Sketchware Pro), Firebase, Bash, Linux. "
+            "Style: Casual, smart, technical, Indonesian."
+        )
 
-        # llm folder (punyamu)
-        if os.path.isdir("./llm"):
-            for f in os.listdir("./llm"):
-                if f.endswith(".gguf"):
-                    return os.path.join("./llm", f)
-
-        # fallback root
-        if os.path.exists("./model.gguf"):
-            return "./model.gguf"
-
-        return None
-
-
-# 🔥 INI YANG PENTING (WAJIB ADA)
-config = Config()
+config = NanoConfig()
