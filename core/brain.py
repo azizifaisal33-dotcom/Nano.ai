@@ -5,6 +5,7 @@ from core.agent import Agent
 from core.revolver import Revolver
 from core.engine import engine
 from core.memory import memory
+from core.knowledge_builder import search_knowledge, add_knowledge
 
 
 # =========================
@@ -23,34 +24,24 @@ class Brain:
         self.cmd_ai = CommandAI()
         self.agent = Agent(self)
         self.revolver = Revolver()
+
         self.session_id = str(uuid.uuid4())[:10]
 
         print("🧠 Nano AI BRAIN ONLINE")
 
     # =========================
-    # INTENT DETECTOR
+    # MEMORY WRAPPER
     # =========================
-    def detect_intent(self, text):
-        t = text.lower()
-
-        if t.startswith("agent"):
-            return "agent"
-        if t.startswith("evolve"):
-            return "evolve"
-
-        chat_words = ["halo", "hai", "siapa", "nama", "apa", "kenapa", "how", "what"]
-        if any(w in t for w in chat_words):
-            return "chat"
-
-        return "command"
+    def remember(self, user, ai, intent):
+        memory.add(self.session_id, user, ai, intent=intent)
 
     # =========================
-    # CHAT RESPONSE
+    # CHAT ENGINE (FALLBACK LOGIC)
     # =========================
     def chat(self, text):
         t = text.lower()
 
-        if "halo" in t or "hai" in t:
+        if "halo" in t:
             return "Halo 👋 aku NanoAI"
         if "siapa kamu" in t:
             return "Aku NanoAI system kamu"
@@ -60,55 +51,47 @@ class Brain:
         return "Aku belum paham, tapi aku belajar 🤖"
 
     # =========================
-    # MEMORY WRAPPER
+    # THINK ENGINE (3 LAYER SYSTEM)
     # =========================
-    def remember(self, user, ai, intent):
-        memory.add(self.session_id, user, ai, intent=intent)
+    def think(self, text):
+        text = text.strip().lower()
 
-    # =========================
-    # AGENT
-    # =========================
-    def handle_agent(self, text):
+        # =========================
+        # [1] KNOWLEDGE LAYER (FASTEST)
+        # =========================
+        kb = search_knowledge(text)
+        if kb:
+            self.remember(text, kb, "knowledge")
+            return kb
+
+        # =========================
+        # [2] MEMORY LAYER (HISTORY)
+        # =========================
+        mem = memory.search(text)
+        if mem:
+            response = mem[0]["ai_response"]
+            self.remember(text, response, "memory")
+            return response
+
+        # =========================
+        # [3] CHAT LOGIC
+        # =========================
         if text.startswith("agent"):
-            return self.agent.start(text)
-        return None
+            res = self.agent.start(text)
+            self.remember(text, str(res), "agent")
+            return res
 
-    # =========================
-    # EVOLVE
-    # =========================
-    def handle_evolve(self, text):
         if text.startswith("evolve"):
             parts = text.split(" ", 2)
             if len(parts) < 3:
                 return "format: evolve <file> <instruction>"
-            return self.revolver.evolve(parts[1], parts[2])
-        return None
-
-    # =========================
-    # MAIN THINK ENGINE
-    # =========================
-    def think(self, text):
-        intent = self.detect_intent(text)
-
-        # CHAT
-        if intent == "chat":
-            res = self.chat(text)
-            self.remember(text, res, "chat")
-            return res
-
-        # AGENT
-        res = self.handle_agent(text)
-        if res:
-            self.remember(text, str(res), "agent")
-            return res
-
-        # EVOLVE
-        res = self.handle_evolve(text)
-        if res:
+            res = self.revolver.evolve(parts[1], parts[2])
             self.remember(text, str(res), "evolve")
             return res
 
+        # =========================
         # COMMAND AI
+        # =========================
         cmds = self.cmd_ai.generate(text)
 
         last_error = ""
@@ -124,6 +107,7 @@ class Brain:
                 if result.get("success"):
                     out = f"⚙️ {c}\n{result['output']}"
                     self.remember(text, out, "command")
+                    add_knowledge(text, result["output"])  # AUTO LEARN
                     return out
 
                 last_error = result.get("output")
@@ -131,6 +115,10 @@ class Brain:
             except Exception as e:
                 last_error = str(e)
 
-        fail = f"❌ gagal\n{last_error if last_error else 'no output'}"
-        self.remember(text, fail, "error")
-        return fail
+        # =========================
+        # CHAT FALLBACK
+        # =========================
+        res = self.chat(text)
+        self.remember(text, res, "chat")
+        add_knowledge(text, res)  # AUTO LEARN CHAT
+        return res
