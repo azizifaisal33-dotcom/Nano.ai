@@ -1,62 +1,149 @@
-NanoAI v2.5 Self-Evolving OS - Autonomous Termux Kernel
-Auto-dependency, PID killer, self-healing bootstrap
+#!/usr/bin/env python3
 """
+NANOAI v2.5 - OMNI-LVR SUPREME ARCHITECTURE
+Indestructible Kernel + LVR-GGUF Cognitive Engine
+"""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# KERNEL-LEVEL BOOTSTRAPPER - INDESTRUCTIBLE
+# ═══════════════════════════════════════════════════════════════════════════════
 
 import os
 import sys
+import ast
+import re
 import subprocess
-import signal
-import psutil
-from pathlib import Path
-import importlib.util
+import traceback
+import json
+import struct
+import mmap
+import hashlib
 import time
+from pathlib import Path
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
 
-class NanoKernel:
-    def __init__(self):
-        self.root = Path(__file__).parent
-        self.pid_file = self.root / "nano.pid"
-        self._kill_ghosts()
-
-    def _kill_ghosts(self):
-        """Kill hanging NanoAI processes"""
-        my_pid = os.getpid()
-        for proc in psutil.process_iter(['pid', 'name']):
-            if 'python' in proc.info['name'].lower() and 'nano' in proc.info['name'].lower():
-                if proc.info['pid'] != my_pid and self.root.name in proc.cmdline():
-                    proc.kill()
-                    print(f"👻 Killed ghost PID {proc.info['pid']}")
-
-    def auto_install(self, packages: list):
-        """Silent pip/pkg install"""
-        for pkg in packages:
-            if 'termux' in pkg:
-                subprocess.run(['pkg', 'install', pkg.replace('termux-', '')], 
-                             capture_output=True)
-            else:
-                subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', pkg], 
-                             capture_output=True)
-            print(f"📦 {pkg} → OK")
-
-    def bootstrap(self):
-        """Full system bootstrap"""
-        print("🧠 NanoAI v2.5 Kernel Boot...")
+# KERNEL BOOT PHASE 1: ENVIRONMENT SANITIZATION
+def kernel_sanitize():
+    """Kill ghost processes, clear locks, setup storage"""
+    try:
+        # Termux storage
+        subprocess.run(["termux-setup-storage"], capture_output=True)
         
-        # Auto-deps
-        deps = ['requests', 'beautifulsoup4', 'psutil']
-        for dep in deps:
-            if not importlib.util.find_spec(dep.replace('-', '_')):
-                self.auto_install([dep])
+        # Kill zombie processes
+        subprocess.run(["pkill", "-f", "nanoai"], capture_output=True)
+        subprocess.run(["rm", "-f", "/tmp/nanoai.lock"], capture_output=True)
         
-        # Regen missing core
-        for core in ['brain.py', 'agent.py', 'revolver.py']:
-            p = self.root / 'core' / core
-            if not p.exists():
-                p.write_text(f"# Auto-regen {core}\nclass {core[:-3].title()}:\n    pass\n")
+        # Auto-install core deps
+        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "requests"], 
+                      capture_output=True)
         
-        # Launch
+        print("🧠 KERNEL: Environment sanitized")
+        return True
+    except:
+        return False
+
+# KERNEL BOOT PHASE 2: SYNTAX VALIDATOR & AUTO-FIXER
+def validate_and_fix_module(module_path: str) -> bool:
+    """AST-based syntax validation + auto-indentation repair"""
+    try:
+        content = Path(module_path).read_text(errors='ignore')
+        
+        # Quick syntax check
+        try:
+            ast.parse(content)
+            return True
+        except SyntaxError as e:
+            print(f"🔧 AUTO-FIX: {module_path} - {e}")
+            
+            # Auto-fix common indentation errors
+            lines = content.split('\n')
+            fixed_lines = []
+            
+            indent_level = 0
+            for line in lines:
+                stripped = line.lstrip()
+                if stripped.startswith(('def ', 'class ', 'if ', 'for ', 'while ', 'try:')):
+                    indent_level = len(line) - len(line.lstrip())
+                
+                if '    ' not in line and (line.strip().endswith(':') or line.strip()):
+                    line = '    ' * (indent_level // 4) + stripped
+                
+                fixed_lines.append(line)
+            
+            fixed_content = '\n'.join(fixed_lines)
+            Path(module_path).write_text(fixed_content)
+            
+            # Re-validate
+            try:
+                ast.parse(fixed_content)
+                print(f"✅ FIXED: {module_path}")
+                return True
+            except:
+                return False
+                
+    except:
+        return False
+
+# KERNEL BOOT PHASE 3: LAZY MODULE LOADER
+def safe_import(module_name: str, module_path: str) -> Any:
+    """Validate before import, fallback to minimal stub"""
+    if validate_and_fix_module(module_path):
+        try:
+            sys.path.insert(0, str(Path(module_path).parent))
+            module = __import__(module_name.replace('/', '.').rstrip('.py'))
+            print(f"✅ LOADED: {module_name}")
+            return module
+        except:
+            pass
+    
+    # Minimal stub fallback
+    print(f"🛠️ STUB: {module_name}")
+    stub_globals = {'__name__': module_name}
+    exec("def think(text): return f'Stub: {text}'", stub_globals)
+    return type(module_name, (), stub_globals)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN KERNEL ENTRYPOINT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def main():
+    root = Path(__file__).parent
+    os.chdir(root)
+    
+    print("🚀 NANOAI v2.5 OMNI-LVR - SUPREME BOOT")
+    
+    # Phase 1: Sanitize
+    if not kernel_sanitize():
+        print("⚠️ Sanitization partial")
+    
+    # Phase 2: Validate core modules
+    core_files = [
+        "core/revolver.py",
+        "core/brain.py", 
+        "core/agent.py",
+        "cli/shell.py"
+    ]
+    
+    for core_file in core_files:
+        validate_and_fix_module(core_file)
+    
+    # Phase 3: Boot Cognitive Shell
+    try:
         from cli.shell import NanoShell
-        NanoShell().start()
+        shell = NanoShell()
+        shell.start()
+    except:
+        print("💥 EMERGENCY SHELL")
+        emergency_shell()
+
+def emergency_shell():
+    """Last resort shell"""
+    while True:
+        cmd = input("EMERGENCY> ").strip()
+        if cmd in ['exit', 'quit']:
+            break
+        os.system(cmd)
 
 if __name__ == "__main__":
-    kernel = NanoKernel()
-    kernel.bootstrap()
+    main()
