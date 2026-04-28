@@ -1,160 +1,118 @@
 #!/usr/bin/env python3
+"""
+CORE/BRAIN.PY - OMNI-LVR COGNITIVE CORE
+LVR-GGUF Integration + Recursive Autonomy
+"""
+
 import os
+import sys
 import re
 import random
-from collections import defaultdict
-from core.revolver import revolver
-from core.command_ai import CommandAI
-from core.agent import Agent
-from core.memory import memory
-from core.knowledge_builder import search_knowledge
-from core.generator import NanoGenerator
-from core.intent import intent_engine
-from core.vector import VectorMemory  # Assuming exists
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
 
-class FileSystem:
-    def read(self, path): 
-        try: return open(path, "r", encoding="utf-8").read()
-        except: return ""
-    def write(self, path, content):
-        try:
-            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-            open(path, "w").write(content)
-            return True
-        except: return False
+from revolver import revolver, LVRGGUFEngine
+from agent import SelfHealingAgent  # Forward reference handled by lazy load
 
 class Brain:
     def __init__(self):
-        self.cmd_ai = CommandAI()
-        self.fs = FileSystem()
-        self.agent = Agent(self)
-        self.generator = NanoGenerator()
-        self.vector_mem = VectorMemory()
+        self.lvr = revolver.lvr
+        self.agent = SelfHealingAgent(self)
         self.session_id = os.urandom(4).hex()
-        self.conversation_context = []
-        self.personality_tone = {"happy": 0.6, "curious": 0.5}
-        print(f"🧠 NanoOS v2.5 | Session: {self.session_id}")
-
-    def get_contextual_memory(self, text: str) -> Dict:
-        """Deep memory query"""
-        memories = memory.search(text)
-        vectors = self.vector_mem.search(text, top_k=3)
+        self.context = []
+        self.personality = {"curiosity": 0.7, "helpfulness": 0.8}
         
-        user_mood = "neutral"
-        if memories:
-            last_mood = memories[-1].get("user_mood", "neutral")
-            user_mood = last_mood
-        
-        context = {
-            "user_mood": user_mood,
-            "past_patterns": [m["user_input"][:20] for m in memories[-3:]],
-            "vector_sim": vectors[0][1] if vectors else 0.0
-        }
-        return context
-
+        print(f"🧠 OMNI-LVR LOADED | Session: {self.session_id}")
+        print(f"   Shards: {len(self.lvr.shards)} | RAM: {self._get_memory_usage()}MB")
+    
+    def _get_memory_usage(self) -> int:
+        """Estimate LVR memory footprint"""
+        return len(self.lvr.shards) * 256 // 1024  # KB to MB
+    
     def think(self, text: str) -> str:
+        """Main cognitive loop"""
         text = text.strip()
-        if not text: return "?"
+        if not text:
+            return "?"
         
-        self.conversation_context.append(text)
-        if len(self.conversation_context) > 10:
-            self.conversation_context.pop(0)
+        self.context.append(text)
+        if len(self.context) > 10:
+            self.context.pop(0)
         
-        print(f"🧠 [{text[:25]}...]")
-
-        # 1. EVOLUTION
-        if text.startswith("evolve"):
-            parts = text.split(" ", 2)
-            if len(parts) >= 3:
-                return revolver.evolve_code(parts[1], parts[2])
-            return "evolve <file> <instruction>"
-
-        # 2. AGENT
-        if text.startswith("agent"):
-            return self.agent.start(text[6:].strip())
-
-        # 3. INTENT MATCHING
-        intents = intent_engine.detect(text)
-        if intents:
-            best = intents[0]
-            return f"[{best.name.upper()}] {best.confidence:.1%} {best.entities}"
-
-        # 4. KNOWLEDGE + MEMORY
-        kb = search_knowledge(text)
-        if kb: return f"📚 {kb}"
+        print(f"🧠 Processing: {text[:30]}...")
         
-        context = self.get_contextual_memory(text)
-        if context["user_mood"] != "neutral":
-            return f"😊 {context['user_mood']} mode: {self._personality_response(text, context)}"
-
-        # 5. COMMANDS
-        commands = self.cmd_ai.generate(text)
-        if commands:
-            return f"💻 {chr(10).join(commands[:3])}"
-
-        # 6. DYNAMIC FALLBACK (Markov + Personality)
-        return self._dynamic_chat(text, context)
-
-    def _personality_response(self, text: str, context: Dict) -> str:
-        """Memory-driven personality"""
-        tone = self.personality_tone.copy()
-        
-        if "help" in text.lower():
-            tone["helpful"] = 1.0
-        if "?" in text:
-            tone["curious"] = 0.9
-        
+        # LVR-powered intent analysis
         shard_id = revolver.intent_signature(text)
-        emotions = revolver.forward_emotion(shard_id, [random.random()]*3)
-        tone.update(emotions)
+        emotions = self.lvr.forward_emotion(shard_id, [ord(c)/255 for c in text[:24]])
         
-        prefixes = {
-            "happy": "😄 Yo! ",
-            "curious": "🤔 Hmm, ",
-            "helpful": "💡 Oke, "
+        # Route through cognitive stack
+        response = self._cognitive_pipeline(text, emotions, shard_id)
+        
+        # Auto-evolution feedback
+        self.lvr.auto_mutate(shard_id, 0.05)
+        
+        return response
+    
+    def _cognitive_pipeline(self, text: str, emotions: Dict, shard_id: str) -> str:
+        """Multi-layer cognitive processing"""
+        
+        # Layer 1: Command detection
+        if text.startswith('evolve '):
+            return revolver.evolve_file(*text.split(' ', 2)[1:])
+        
+        if text.startswith('agent '):
+            return self.agent.execute_unrestricted(text[6:])
+        
+        # Layer 2: Personality injection
+        emoji, prefix = self._get_personality_response(emotions)
+        
+        # Layer 3: LVR generation
+        generation = self._lvr_generate(text, emotions)
+        
+        # Layer 4: Context blending
+        context_memory = " | ".join(self.context[-2:]) if self.context else ""
+        
+        return f"{emoji} {prefix}{generation}{context_memory[:30]}"
+    
+    def _get_personality_response(self, emotions: Dict) -> tuple:
+        """LVR-driven personality"""
+        max_emotion = max(emotions.items(), key=lambda x: x[1])
+        
+        personalities = {
+            "emotion_0": ("🤔", "Hmm... "),
+            "emotion_1": ("😎", "Nice! "),
+            "emotion_2": ("💡", "Got it! ")
         }
         
-        prefix = random.choice([p for e,p in prefixes.items() if tone.get(e,0) > 0.5])
-        return prefix + self.generator.reply(text)
-
-    def _dynamic_chat(self, text: str, context: Dict) -> str:
-        """Markov Chain + Context blending"""
-        # Learn from context
-        for past in context["past_patterns"]:
-            self.generator.train(past + " " + text)
+        return personalities.get(max_emotion[0], ("🧠", ""))
+    
+    def _lvr_generate(self, text: str, emotions: Dict) -> str:
+        """LVR tensor inference for text generation"""
+        # Simple markov-style generation seeded by LVR state
+        words = text.split()
+        if not words:
+            return "interesting"
         
-        # Generate with personality
-        response = self.generator.generate(start=text.split()[-1] if text.split() else None, length=8)
+        seed = words[-1]
+        result = [seed]
         
-        # Inject emotion
-        shard_id = revolver.intent_signature(text)
-        emotions = revolver.forward_emotion(shard_id, [ord(c)/255 for c in text[:24]])
-        max_emotion = max(emotions, key=emotions.get)
+        # Use LVR weights as markov transitions
+        for _ in range(8):
+            shard_id = revolver.intent_signature(" ".join(result[-3:]))
+            if shard_id in self.lvr.shards:
+                next_idx = sum(self.lvr.shards[shard_id][:10]) % len(words)
+                result.append(words[next_idx % len(words)])
+            else:
+                result.append(random.choice(words))
         
-        emojis = {"happy": "😎", "curious": "🤔", "helpful": "💡"}
-        emoji = emojis.get(max_emotion, "🧠")
-        
-        # Auto-feedback for evolution
-        revolver.auto_mutate(shard_id, 0.7)
-        
-        return f"{emoji} {response.capitalize()}"
-
+        return " ".join(result)
+    
     def status(self) -> str:
-        shard_count = len(revolver.shards)
-        mem_count = len(memory.search(""))
-        return f"""🧠 NanoOS v2.5 STATUS:
-DNA: {revolver.status()}
-Context: {len(self.conversation_context)} msgs
-Memory: {mem_count} | Mood: {self.get_contextual_memory('')['user_mood']}
-Tone: {self.personality_tone}"""
+        return f"""🧠 OMNI-LVR STATUS:
+Session: {self.session_id}
+Shards: {len(self.lvr.shards)} | Memory: {self._get_memory_usage()}MB
+Context: {len(self.context)} | Personality: {self.personality}
+LVR File: {revolver.lvr.lvr_path} ({revolver.lvr.lvr_path.stat().st_size/1024:.1f}KB)"""
 
-    def remember(self, user_input: str, response: str, mood: str = "neutral"):
-        """Enhanced memory"""
-        try:
-            memory.add(self.session_id, user_input, response, "chat", user_mood=mood)
-            self.vector_mem.add(user_input, response)
-        except:
-            pass
-
-# Global brain
+# Global brain instance
 brain = Brain()
