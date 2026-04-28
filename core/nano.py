@@ -1,10 +1,10 @@
 import random
-import os # Tambahkan os untuk path yang lebih aman
-from typing import Dict, List, Any, Optional
+import re
+from typing import List, Dict, Any, Optional
+
 from core.tokenizer import tokenizer
 from core.vector import vectorstore
 from core.intent import intent_engine
-# from core.memory import memory  
 from core.generator import generator
 from core.engine import NanoEngine
 from core.math_utils import NanoMath 
@@ -25,20 +25,29 @@ class NanoAI:
     def __init__(self):
         self.engine = NanoEngine()
         self.session_id = "nano-session-001"
+        # Memastikan folder data ada untuk penyimpanan biner/sqlite
+        import os
+        os.makedirs("data", exist_ok=True)
+
+    def start_shell(self):
+        """Koneksi ke CLI Shell (Fix AttributeError)"""
+        from cli.shell import NanoShell
+        shell = NanoShell()
+        shell.start()
 
     def think(self, user_input: str) -> Dict[str, Any]:
-        """Complete neural thinking pipeline"""
+        """Full neural thinking pipeline - 100% Custom"""
         print(f"\n{Color.BOLD}{Color.CYAN}🧠 NanoAI thinking...{Color.END}")
 
         # 1. TOKENIZATION
         token_ids = tokenizer.encode(user_input)
         print(f"📝 Tokens: {len(token_ids)}")
 
-        # 2. INTENT DETECTION (DIREVISI)
+        # 2. INTENT DETECTION
         intents = intent_engine.detect(user_input)
-        # Ambil elemen pertama () agar mendapatkan objek IntentMatch, bukan List
+        # Ambil intent teratas jika ada
         top_intent = intents if (isinstance(intents, list) and len(intents) > 0) else None
-
+        
         intent_name = top_intent.name if top_intent else 'unknown'
         print(f"🎯 Top intent: {Color.YELLOW}{intent_name}{Color.END}")
 
@@ -51,26 +60,20 @@ class NanoAI:
         tool_used = "generate"
         execution_result = {"output": "", "success": True}
 
-        # Menggunakan intent_name agar lebih aman
-        if top_intent and intent_name in ['system_info', 'package_install']:
+        if top_intent and intent_name in ['system_info', 'package_install', 'file_ops']:
             tool_used = intent_name
             cmd = self._build_command(top_intent, user_input)
             execution_result = self.engine.run(cmd)
 
         # 5. RESPONSE GENERATION
+        # Menggunakan generator internal (Markov/Custom)
         response = generator.generate(
-            intent=intent_name,
-            context={
-                'entities': top_intent.entities if top_intent else {},
-                'tool': tool_used,
-                'memory_hit': memory_hit
-            },
-            output=execution_result['output'],
-            input_text=user_input
+            start=user_input.split() if user_input.split() else None,
+            length=15
         )
 
         # 6. LEARN & EVOLVE (Revolver DNA Update)
-        # Pastikan revolver menerima list kata
+        # Update file .lvr secara biner
         revolver.evolve(user_input.split())
 
         # 7. VECTOR STORE UPDATE
@@ -79,7 +82,8 @@ class NanoAI:
             'session': self.session_id
         })
 
-        return {
+        # Kembalikan hasil untuk ditampilkan di shell
+        result = {
             'input': user_input,
             'tokens': len(token_ids),
             'top_intent': intent_name,
@@ -88,14 +92,21 @@ class NanoAI:
             'response': response,
             'success': execution_result['success']
         }
+        
+        # Tampilkan panel berpikir secara visual
+        self.show_thinking(result)
+        
+        return result
 
     def _dummy_embedding(self, token_ids: List[int]) -> List[float]:
+        """Pembangkit vector sederhana tanpa library external"""
         seed = sum(token_ids) % 1000
         random.seed(seed)
+        # Output 384 dimensi sesuai standar NanoVectorStore
         return [random.uniform(-1, 1) for _ in range(384)]
 
     def _build_command(self, intent_match: Any, input_text: str) -> str:
-        # Pengecekan atribut secara aman
+        """Translasi intent menjadi perintah bash Termux"""
         name = getattr(intent_match, 'name', 'unknown')
         entities = getattr(intent_match, 'entities', {})
 
@@ -104,10 +115,12 @@ class NanoAI:
             return f"pkg install {pkg} -y"
         elif name == 'system_info':
             return "free -h && df -h && uptime"
-        return "echo 'Command executed'"
+        elif name == 'file_ops':
+            return "ls -la"
+        return "echo 'Command processed'"
 
     def show_thinking(self, result: Dict):
-        """Manual Panel Visualization (No Rich)"""
+        """Visualisasi proses berpikir (Manual pengganti Rich)"""
         line = "─" * 40
         m_status = f"{Color.GREEN}✅ Hit{Color.END}" if result['memory_hit'] else f"{Color.RED}❌ Miss{Color.END}"
         s_status = f"{Color.GREEN}✅{Color.END}" if result['success'] else f"{Color.RED}❌{Color.END}"
@@ -121,6 +134,7 @@ class NanoAI:
         print(f"│ Memory : {m_status}")
         print(f"│ Success: {s_status}")
         print(f"{Color.CYAN}└{line}┘{Color.END}")
+        print(f"\n{Color.BOLD}Assistant:{Color.END} {result['response']}")
 
 # Global instance
 nano_ai = NanoAI()
