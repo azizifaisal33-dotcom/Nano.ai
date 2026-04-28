@@ -1,32 +1,20 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from config import config
+"""
+⚙️ NanoAI Config - 100% Custom
+Hanya berisi pengaturan sistem dasar.
+"""
 
-class NanoEngine:
+class Config:
     def __init__(self):
-        # Memuat tokenizer dan model ke CPU
-        self.tokenizer = AutoTokenizer.from_pretrained(config.MODEL_ID)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            config.MODEL_ID,
-            torch_dtype=torch.float32,
-            device_map="cpu",
-            low_cpu_mem_usage=True
-        )
+        self.NAME = "NanoAI"
+        self.VERSION = "2.0-STABLE"
+        self.BASE_DIR = "data"
+        self.LOG_FILE = "logs/session.log"
+        
+        # Pengaturan untuk Generator buatanmu sendiri
+        self.MAX_GEN_LENGTH = 12
+        self.EVOLVE_THRESHOLD = 0.5
 
-    def generate(self, user_input):
-        prompt = f"{config.get_system_prompt()}\nUser: {user_input}\nAssistant:"
-        
-        inputs = self.tokenizer(prompt, return_tensors="pt").to("cpu")
-        
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=config.MAX_NEW_TOKENS,
-                temperature=config.TEMPERATURE,
-                do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-        
-        return self.tokenizer.decode(outputs, skip_special_tokens=True).split("Assistant:")[-1].strip()
+    def get_system_prompt(self):
+        return f"Kamu adalah {self.NAME}, asisten terminal yang belajar dari nol."
 
-engine = NanoEngine()
+config = Config()
