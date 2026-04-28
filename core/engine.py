@@ -1,32 +1,23 @@
 """
-⚙️ NanoEngine - Lightweight Execution Core
-No Torch, No Transformers - 100% Termux Stable
+⚙️ NanoEngine - 100% Buatan Sendiri
+Menggunakan logika internal tanpa library eksternal.
 """
-from config import config
+from core.generator import generator
+from core.command_ai import CommandAI
 
 class NanoEngine:
     def __init__(self):
-        # Kita matikan load model Transformers agar tidak ModuleNotFoundError
-        print("⚙️ Engine: Lightweight Mode Active (No Torch)")
+        self.cmd_ai = CommandAI()
+        print("⚙️ NanoEngine: Murni Aktif (Bebas dari karya orang lain)")
 
-    def run(self, command: str):
-        """Menjalankan perintah sistem melalui shell Termux"""
-        import subprocess
-        try:
-            # Jalankan command dan ambil outputnya
-            result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT, text=True)
-            return {"output": result, "success": True}
-        except subprocess.CalledProcessError as e:
-            return {"output": e.output, "success": False}
-        except Exception as e:
-            return {"output": str(e), "success": False}
+    def generate(self, user_input):
+        # 1. Cek apakah ini perintah terminal (lewat CommandAI kamu)
+        commands = self.cmd_ai.generate(user_input)
+        
+        # 2. Jika bukan perintah sistem, gunakan Generator Markov milikmu
+        if not commands or commands == user_input:
+            return generator.reply(user_input)
+            
+        return f"Saran perintah: {', '.join(commands)}"
 
-    def generate(self, user_input: str):
-        """
-        Fallback generator jika model Transformers tidak ada.
-        Bisa diarahkan ke NanoGenerator di core/generator.py
-        """
-        return f"NanoAI: Eksekusi perintah '{user_input}' selesai."
-
-# Global instance agar bisa dipanggil oleh nano.py atau brain.py
 engine = NanoEngine()
