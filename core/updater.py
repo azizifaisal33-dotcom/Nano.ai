@@ -1,84 +1,55 @@
-import os
-import requests
-import json
-import shutil
 import subprocess
+import os
+import sys
+from config import config
 
 class NanoUpdater:
-    def __init__(self, repo_url, branch="main"):
-        self.repo_url = repo_url
-        self.branch = branch
-        self.version_file = "version.json"
+    def __init__(self):
+        self.repo_path = os.getcwd()  # Mengambil lokasi folder Nano.ai
+        self.owner = config.OWNER
 
-    # =========================
-    # CHECK VERSION
-    # =========================
-    def get_remote_version(self):
+    def run_command(self, command):
+        """Menjalankan perintah bash dan mengambil outputnya"""
         try:
-            url = f"{self.repo_url}/raw/{self.branch}/version.json"
-            data = requests.get(url).json()
-            return data["version"]
-        except:
-            return None
+            result = subprocess.run(
+                command, shell=True, check=True, 
+                capture_output=True, text=True
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            return f"Error: {e.stderr}"
 
+    def check_for_updates(self):
+        """Cek apakah ada perubahan di GitHub"""
+        print(f"[*] Menghubungkan ke GitHub untuk proyek {self.owner}...")
+        self.run_command("git fetch")
+        local_hash = self.run_command("git rev-parse HEAD")
+        remote_hash = self.run_command("git rev-parse @{u}")
 
-    # =========================
-    # LOCAL VERSION
-    # =========================
-    def get_local_version(self):
-        if not os.path.exists(self.version_file):
-            return "0.0.0"
-
-        return json.load(open(self.version_file))["version"]
-
-
-    # =========================
-    # DOWNLOAD UPDATE
-    # =========================
-    def download_update(self):
-        print("⬇️ downloading update...")
-
-        os.system(f"git clone {self.repo_url} update_tmp")
-
-        return "update_tmp"
-
-
-    # =========================
-    # APPLY UPDATE
-    # =========================
-    def apply_update(self, folder):
-        print("🔁 applying update...")
-
-        for item in os.listdir(folder):
-            src = os.path.join(folder, item)
-            dst = os.path.join(".", item)
-
-            if os.path.isdir(src):
-                shutil.copytree(src, dst, dirs_exist_ok=True)
-            else:
-                shutil.copy2(src, dst)
-
-
-    # =========================
-    # UPDATE SYSTEM
-    # =========================
-    def update(self):
-        local = self.get_local_version()
-        remote = self.get_remote_version()
-
-        print(f"📌 local: {local} | remote: {remote}")
-
-        if remote and remote != local:
-            folder = self.download_update()
-
-            self.apply_update(folder)
-
-            print("✅ update applied")
-
-            # cleanup
-            os.system("rm -rf update_tmp")
-
+        if local_hash != remote_hash:
             return True
-
-        print("🟢 already up to date")
         return False
+
+    def evolve_system(self):
+        """Proses download kode baru dan instalasi library"""
+        if self.check_for_updates():
+            print("[!] Versi baru ditemukan! Memulai proses evolusi...")
+            
+            # 1. Pull kode terbaru
+            pull_status = self.run_command("git pull origin main")
+            print(f"[+] Git Pull: {pull_status}")
+
+            # 2. Update library (requirements.txt)
+            if os.path.exists("requirements.txt"):
+                print("[*] Mengupdate library yang diperlukan...")
+                self.run_command("pip install -r requirements.txt")
+
+            print("[√] Evolusi selesai. NanoAI perlu restart.")
+            return True
+        else:
+            print("[√] NanoAI sudah dalam versi terbaru.")
+            return False
+
+    def restart_nano(self):
+        """Mematikan proses sekarang dan memulai ulang main.py"""
+        print("[*] Sedang merestart
